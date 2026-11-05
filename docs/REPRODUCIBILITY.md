@@ -34,6 +34,8 @@ python Scripts/16_auto_news_research.py --ticker NVDA --query NVIDIA --days 30 -
 
 Check `Results/NVDA/ExternalAuto/<RUN_ID>/16_research_audit.json` for `lm_status`, exclusions, eligible counts and the intraday-time warning. The `16_external_lm_summary.csv` links to the article sources; no original publisher body is redistributed in this repo.
 
+**Local hardware / model specification:** The reported experimental model was `qwen2.5:1.5b` running through local Ollama on a memory-limited personal Mac (~5 GB available during development). This was a resource-constrained pilot, not a trained/fine-tuned or validated finance LLM. `Scripts/12_local_llm_labels.py` calls `http://127.0.0.1:11434/api/chat` with `temperature=0`, `num_ctx=2048`, `num_predict=240`, JSON output constraints, source evidence IDs and failure audits. Keep the model choice explicit in commands. The legacy `run_all.py` default is different; pass `--llm-model qwen2.5:1.5b` there. Model weights and Ollama runtime must be obtained separately; this repository includes neither.
+
 Optional LLM (Ollama installed locally with `ollama pull qwen2.5:1.5b`):
 
 ```bash
