@@ -9,7 +9,7 @@ The architecture is designed for wider U.S. equity coverage. Given the computing
 
 > **Research status:** Working local engineering prototype; **not** a validated stock-price predictor, causal event study, production crawler or investment recommendation.
 
-## Research Motivation and Predoc-Relevant Skills
+## Research Motivation and Technical Contributions
 
 **Research question:** How can nontraditional financial text be collected, transformed into replicable economic measures, and evaluated against subsequent market outcomes without confusing textual tone with an economic shock?
 
