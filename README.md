@@ -1,8 +1,35 @@
-# News2Market v3.1
+# News2Market v3.1.1
 
 **Nasdaq-only historical-data import · Three-company news research · 100% English local dashboard**
 
 A reproducible research/engineering prototype for exploratory financial-news measurement. Select NVIDIA (NVDA), Apple (AAPL), or Alphabet Class A / Google (GOOGL). The same Python pipeline handles company-aware news discovery, extraction, Loughran–McDonald (LM) financial lexicon measurement, optional local Ollama Qwen2.5 1.5B labels and *exploratory* close-to-close relative-return analysis against QQQ.
+
+## Research motivation and predoc-relevant skills
+
+**Research question.** Can publicly available corporate announcements and third-party reporting be converted into **traceable, firm-specific economic text measures**, and how should those measures be validated before they are linked to financial-market outcomes? The emphasis is on **building the dataset, defining the measurement, and testing its limitations**—not claiming to predict stock prices.
+
+This project provides concrete examples of research-assistant tasks commonly required in empirical economics and finance:
+
+| Research skill | Evidence in this repository |
+|---|---|
+| **Web scraping and non-traditional data collection** | Collects NVIDIA issuer announcements and discovers firm-relevant news through public RSS feeds; extracts permitted publisher text, handles unavailable/rate-limited sources, and records source URLs and publication-date quality. |
+| **Constructing research datasets and data parsing** | Converts unstructured HTML/RSS into standardized article-level records; applies source-aware deduplication and quality checks; joins article measurements with dated Nasdaq equity and QQQ benchmark data. Keeps provenance and audit files so records can be traced to their source. |
+| **Python-based NLP and AI-assisted measurement** | Implements Loughran–McDonald financial word counts, per-1,000-word positive/negative/uncertainty frequencies, and a secondary polarity index. Optionally uses **local Ollama/Qwen2.5 1.5B** for structured event and economic-channel annotations with JSON/evidence checks; these LLM labels are **not validated ground truth**. |
+| **Statistical analysis in Python** | Builds daily, date-aligned sentiment and return observations; computes correlations and exploratory OLS with HC1 standard errors; generates plots, coefficient estimates, and machine-readable analysis summaries with limitations. |
+| **Research design, sensitivity checks, and diagnostics** | Compares original versus boilerplate-cleaned text; checks sparse dictionary matches, missing data and model-output failures; distinguishes issuer press releases from independent editorial sources. These are observational measurement and engineering evaluations, **not randomized experiments**. |
+| **Communicating research results** | Documents methods, data sources, variable definitions, null findings and unresolved threats to validity in a reproducibility guide and [research report](docs/RESEARCH_REPORT.md), rather than treating technically successful code as proof of an economic effect. |
+
+### A concrete research workflow
+
+1. **Acquire:** discover and collect company-relevant news; preserve the original link, source classification and timing caveats.
+2. **Structure:** extract full text, identify duplicates and boilerplate, and build a documented **article-level research dataset**.
+3. **Measure:** compute explainable financial-text variables, including word-frequency rates and an alternative polarity index; preserve original versus cleaned versions.
+4. **Validate:** audit data quality and local-LLM outputs, construct dated stock/benchmark outcomes, and conduct **exploratory** statistical tests.
+5. **Report:** publish the method, code, assumptions, reproducibility instructions, and negative findings alongside the outputs.
+
+**Observed historical example (NVIDIA only):** 30 first-party announcements produced 18 dated sentiment-signal days; the exploratory NVDA-minus-QQQ regression showed no statistically significant association (HC1 `p ≈ 0.860`). The strength of this example is the auditable research workflow, **not** a positive predictive result. The v3 interface extends the *software design* to Apple and Alphabet; it does not establish three independently validated economic findings.
+
+**Scope and non-claims.** The repository demonstrates **Python**, rather than claiming experience here with R, Stata or MATLAB. It uses **pretrained local-LLM inference**, not custom model training or fine-tuning. **OCR, large-scale historical database infrastructure, structural/dynamic economic modeling, randomized experiments and a comprehensive literature review are not implemented in this project.** The measurement design draws on the Loughran–McDonald financial-text literature, but independent economic validity must still be tested. These are potential extensions with additional research resources, not completed work.
 
 ## Quick start
 
