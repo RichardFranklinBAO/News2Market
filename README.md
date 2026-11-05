@@ -4,6 +4,77 @@
 
 **Company-aware web scraping and financial-text dataset construction across three U.S.-listed firms.** Select NVIDIA (NVDA), Apple (AAPL), or Alphabet Class A / Google (GOOGL) in the English dashboard. A **single shared Python pipeline** dynamically selects the corresponding issuer source and company-specific news query, discovers third-party coverage, extracts permitted text, constructs an auditable firm-level news dataset, applies Loughran–McDonald (LM) financial text measures, and optionally runs local Ollama/Qwen2.5 1.5B labeling and exploratory QQQ-relative return analysis. **No separate per-company analysis scripts or manually entered article URLs are required.** This is a three-firm research prototype, not an all-U.S.-equity crawler.
 
+## Quick Start — reproduce the project in five steps
+
+**For research reviewers:** This repository provides the **source code**, not redistributed third-party research inputs. The **official Loughran–McDonald (LM) dictionary** and **Nasdaq historical CSVs for the selected stock and QQQ** must be obtained separately before a live research run. The interface is in English. Python **3.11 or 3.12** is recommended; the instructions below use macOS/Linux Terminal.
+
+**Step 1 — Clone the repository and install the environment**
+
+```bash
+git clone https://github.com/RichardFranklinBAO/News2Market.git
+cd News2Market
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements_v3.txt
+```
+
+Alternatively, choose **Code → Download ZIP** on GitHub, extract it, and run the environment commands from that extracted folder. **Repository visibility:** while this repository remains private, GitHub access is restricted to the owner and invited collaborators; it must be made public (or access granted) before external reviewers can clone it.
+
+**Step 2 — Obtain the official LM financial dictionary**
+
+Download the **1993–2025 Loughran–McDonald Master Dictionary CSV** from [Notre Dame SRAF](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) and place it at this **exact path**:
+
+```text
+Inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv
+```
+
+The lexicon is **not bundled in GitHub**. It is mandatory for LM scoring; do not replace it with a sample or synthetic dictionary. For an existing local installation, the dashboard may reuse a validated copy from a sibling project; an independent first-time installation should use the official download.
+
+**Step 3 — Check that the code runs**
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+A passing test run ends with **OK**; tests needing unavailable optional real-world inputs may be **skipped**. The tests include offline/synthetic fixtures and therefore **do not establish live news coverage or economic predictive accuracy**.
+
+**Step 4 — Launch the English dashboard and import Nasdaq prices**
+
+```bash
+python run_v3.py --web
+# If "Address already in use" appears, try:
+# python run_v3.py --web --port 8766
+```
+
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765) (or **8766** if you changed the port). Select **NVIDIA (NVDA)**, **Apple (AAPL)**, or **Alphabet/Google (GOOGL)**.
+
+Use the **Nasdaq Historical Data → Import Nasdaq CSV** section to load:
+
+- The **selected company's** daily Nasdaq historical CSV (NVDA / AAPL / GOOGL), downloaded from its [official Nasdaq page](#market-data--nasdaq-only-no-yahoo).
+- The **QQQ** daily Nasdaq historical CSV, downloaded from the linked Nasdaq ETF page.
+
+Each file must contain **Date** and **Close/Last**. Confirm the actual ticker and Nasdaq origin in the dashboard before importing: the raw Nasdaq CSV does not itself identify the ticker. **Both stock and QQQ must show Ready**, and the **LM Dictionary** status must also indicate it is installed or available for validated reuse. Price files are imported once and then reused locally. **This free version does not automatically download Nasdaq data** or use Yahoo Finance.
+
+**Step 5 — Run a real research collection and inspect outputs**
+
+Choose a news window (e.g. **30 days**), price history (e.g. **5 years**), and an article cap (e.g. **10**). Leave **Local LLM** unchecked for the first run, then click **Run research**.
+
+The dashboard displays news items, LM financial-text measures, price coverage, audit messages, and any **exploratory** return association that can be estimated. Each run saves files to:
+
+```text
+Results/<TICKER>/V3/<UTC_RUN_ID>/
+  v3_report.json         # Run status, source/coverage warnings and results
+  05_lm_labels.csv       # Article-level financial lexicon measurements
+  07_prices.csv          # Date-aligned stock and QQQ prices
+  07_price_audit.json    # Price-source and date-coverage evidence
+```
+
+**How to judge success:** verify the run status and actual outputs, not merely that the webpage opens. A new crawl can collect **zero** articles if RSS feeds or publisher pages are unavailable; an insignificant or missing regression is **not** a prediction success. Date-only publication information limits market-time alignment. For methods, historical pilot results and caveats, see [Research Report](docs/RESEARCH_REPORT.md) and [Reproducibility](docs/REPRODUCIBILITY.md).
+
+---
+
+
 ## Research motivation and predoc-relevant skills
 
 **Research question.** Can publicly available corporate announcements and third-party reporting be converted into **traceable, firm-specific economic text measures**, and how should those measures be validated before they are linked to financial-market outcomes? The emphasis is on **building the dataset, defining the measurement, and testing its limitations**—not claiming to predict stock prices.
@@ -44,20 +115,6 @@ The **same** function, `v3_core.discover_news()`, is called regardless of the ch
 **Observed historical example (NVIDIA only):** 30 first-party announcements produced 18 dated sentiment-signal days; the exploratory NVDA-minus-QQQ regression showed no statistically significant association (HC1 `p ≈ 0.860`). The strength of this example is the auditable research workflow, **not** a positive predictive result. The v3 interface extends the *software design* to Apple and Alphabet; it does not establish three independently validated economic findings.
 
 **Scope and non-claims.** The repository demonstrates **Python**, rather than claiming experience here with R, Stata or MATLAB. It uses **pretrained local-LLM inference**, not custom model training or fine-tuning. **OCR, large-scale historical database infrastructure, structural/dynamic economic modeling, randomized experiments and a comprehensive literature review are not implemented in this project.** The measurement design draws on the Loughran–McDonald financial-text literature, but independent economic validity must still be tested. These are potential extensions with additional research resources, not completed work.
-
-## Quick start
-
-```bash
-# In a fresh GitHub clone of this repository:
-python -m pip install -r requirements_v3.txt
-python run_v3.py --web
-```
-
-**Before pressing Run:** the dashboard displays the required **official Loughran–McDonald dictionary** and Nasdaq stock/QQQ CSV status. The dictionary is **not included in GitHub**. The program first checks `Inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv` and, if missing, tries to validate and reuse a local copy from a sibling `News2Market/Inputs/` directory. If neither exists, download the official version from [Notre Dame SRAF](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) and place it under `Inputs/`. The run stops **before any market/news requests** if the file is absent or invalid; it never uses a synthetic substitute.
-
-The Nasdaq CSV files likewise remain local-only, can be imported through the English dashboard, and must include the selected stock **plus QQQ**. A new clone without these authorized research inputs will show installation prompts, not produce empirical results.
-
-Open `http://127.0.0.1:8765`. The UI, status indicators, data import, charts, and explanations are entirely in English. More detailed setup is in [`V3_START_HERE.md`](V3_START_HERE.md).
 
 ## Market data — Nasdaq only (no Yahoo)
 
