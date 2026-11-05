@@ -2,7 +2,7 @@
 
 **Nasdaq-only historical-data import · Three-company news research · 100% English local dashboard**
 
-A reproducible research/engineering prototype for exploratory financial-news measurement. Select NVIDIA (NVDA), Apple (AAPL), or Alphabet Class A / Google (GOOGL). The same Python pipeline handles company-aware news discovery, extraction, Loughran–McDonald (LM) financial lexicon measurement, optional local Ollama Qwen2.5 1.5B labels and *exploratory* close-to-close relative-return analysis against QQQ.
+**Company-aware web scraping and financial-text dataset construction across three U.S.-listed firms.** Select NVIDIA (NVDA), Apple (AAPL), or Alphabet Class A / Google (GOOGL) in the English dashboard. A **single shared Python pipeline** dynamically selects the corresponding issuer source and company-specific news query, discovers third-party coverage, extracts permitted text, constructs an auditable firm-level news dataset, applies Loughran–McDonald (LM) financial text measures, and optionally runs local Ollama/Qwen2.5 1.5B labeling and exploratory QQQ-relative return analysis. **No separate per-company analysis scripts or manually entered article URLs are required.** This is a three-firm research prototype, not an all-U.S.-equity crawler.
 
 ## Research motivation and predoc-relevant skills
 
@@ -12,16 +12,30 @@ This project provides concrete examples of research-assistant tasks commonly req
 
 | Research skill | Evidence in this repository |
 |---|---|
-| **Web scraping and non-traditional data collection** | Collects NVIDIA issuer announcements and discovers firm-relevant news through public RSS feeds; extracts permitted publisher text, handles unavailable/rate-limited sources, and records source URLs and publication-date quality. |
-| **Constructing research datasets and data parsing** | Converts unstructured HTML/RSS into standardized article-level records; applies source-aware deduplication and quality checks; joins article measurements with dated Nasdaq equity and QQQ benchmark data. Keeps provenance and audit files so records can be traced to their source. |
+| **Company-aware web scraping and non-traditional data collection** | Uses one company-configured discovery pipeline for **NVDA, AAPL and GOOGL** rather than an NVIDIA-only scraper: NVIDIA Newsroom HTML; Apple Newsroom RSS; Google Blog RSS; and shared third-party search/publisher RSS. It screens company-specific candidates, follows permitted article links, extracts publisher text, logs blocked/timed-out feeds and records source/time provenance. |
+| **Constructing firm-specific research datasets and data parsing** | Converts unstructured company-specific issuer HTML/RSS and independent publisher pages into consistently structured, **ticker-labeled article-level datasets**; normalizes links, deduplicates and audits sources, and joins eligible text measures with the **selected firm's** Nasdaq historical CSV and QQQ benchmark. Each ticker has its own run directory and provenance files. |
 | **Python-based NLP and AI-assisted measurement** | Implements Loughran–McDonald financial word counts, per-1,000-word positive/negative/uncertainty frequencies, and a secondary polarity index. Optionally uses **local Ollama/Qwen2.5 1.5B** for structured event and economic-channel annotations with JSON/evidence checks; these LLM labels are **not validated ground truth**. |
 | **Statistical analysis in Python** | Builds daily, date-aligned sentiment and return observations; computes correlations and exploratory OLS with HC1 standard errors; generates plots, coefficient estimates, and machine-readable analysis summaries with limitations. |
 | **Research design, sensitivity checks, and diagnostics** | Compares original versus boilerplate-cleaned text; checks sparse dictionary matches, missing data and model-output failures; distinguishes issuer press releases from independent editorial sources. These are observational measurement and engineering evaluations, **not randomized experiments**. |
 | **Communicating research results** | Documents methods, data sources, variable definitions, null findings and unresolved threats to validity in a reproducibility guide and [research report](docs/RESEARCH_REPORT.md), rather than treating technically successful code as proof of an economic effect. |
 
+### Company-aware news crawling: one pipeline, three selectable stocks
+
+The **same** function, `v3_core.discover_news()`, is called regardless of the chosen ticker. A compact `COMPANIES` registry provides the **issuer identity, ticker, news query, known aliases, official source and SEC CIK**; these are configuration values, **not three copies of the scraper**. The dashboard passes the selected ticker to `v3_core.run_pipeline()`, which uses the corresponding profile throughout collection, dataset creation and the analysis pipeline.
+
+| Selected company | Configured first-party discovery | Additional independent discovery | Company-aware filtering |
+|---|---|---|---|
+| **NVIDIA — NVDA** | Dedicated NVIDIA Newsroom HTML collector | Public search/publisher RSS, including Google News search, TechCrunch, CNBC Tech and Ars Technica | NVIDIA, NVDA, GeForce, Blackwell and other profile aliases |
+| **Apple — AAPL** | [Apple Newsroom RSS](https://www.apple.com/newsroom/rss-feed.rss) | The **same** search/publisher RSS sources, queried for Apple | Apple, AAPL, iPhone, iPad, MacBook and related aliases; excludes some obvious fruit-related false positives |
+| **Alphabet / Google — GOOGL** | [Google Blog RSS](https://blog.google/rss/) (official company blog, **not** an issuer-press-release archive) | The **same** search/publisher RSS sources, queried for Google | Google, Alphabet, GOOGL, DeepMind, Google Cloud and related aliases |
+
+**For each selected company:** query the configured available feeds → filter by query, date and company aliases → normalize URLs and remove duplicate candidates → attempt permitted full-text extraction → classify first-party vs. third-party sources → build and audit the firm's article records → compute LM financial-text features. Company-specific output is isolated under `Results/<TICKER>/V3/<run_id>/`. The selected firm's market-price CSV is paired with **QQQ** using a separate shared analysis stage; prices must first be obtained/imported from Nasdaq under the provider's terms.
+
+**What the implementation does not yet establish:** RSS retrieval and source coverage depend on network access, site permissions and publisher layouts. Some filtering is heuristic and can miss articles or admit unrelated mentions. NVIDIA's separate HTML collector is currently unique to NVIDIA; the Apple and Google issuer sources use their configured RSS feeds. **Live news collection and downstream empirical outputs have not been independently validated for all three companies.** Three-stock offline tests demonstrate software routing, **not** complete real-world news coverage, comprehensive market-wide scraping, OCR, or verified economic validity.
+
 ### A concrete research workflow
 
-1. **Acquire:** discover and collect company-relevant news; preserve the original link, source classification and timing caveats.
+1. **Acquire:** select NVDA/AAPL/GOOGL; dynamically query that company's configured issuer source and third-party RSS coverage, then preserve original links, ticker identity, source classification and timing caveats.
 2. **Structure:** extract full text, identify duplicates and boilerplate, and build a documented **article-level research dataset**.
 3. **Measure:** compute explainable financial-text variables, including word-frequency rates and an alternative polarity index; preserve original versus cleaned versions.
 4. **Validate:** audit data quality and local-LLM outputs, construct dated stock/benchmark outcomes, and conduct **exploratory** statistical tests.
@@ -64,7 +78,7 @@ Original NVDA/QQQ pilot range: **2021-11-05 through 2026-11-04** (1,254 paired t
 
 1. **Company identity:** fixed and audited profiles for NVDA, AAPL and GOOGL (including ticker, official source, CIK and search aliases).
 2. **Historical prices:** verified local Nasdaq CSVs for the selected stock and QQQ; no cross-vendor mixing; dated joins and per-run provider audits.
-3. **News retrieval:** NVIDIA Newsroom or issuer RSS plus third-party RSS; canonical URL deduplication; respectful, restricted-access HTML requests.
+3. **Company-aware news retrieval:** the selected NVDA/AAPL/GOOGL profile dynamically controls the issuer-specific HTML/RSS source, company name/aliases, date and keyword filtering, plus shared independent publisher feeds; canonical URL deduplication and respectful, restricted-access HTML requests.
 4. **Text extraction and quality control:** bounded extraction; original evidence retained; page/RSS date audit; source-specific boilerplate controls.
 5. **LM dictionary sentiment:** Notre Dame's Loughran–McDonald Master Dictionary (user-downloaded separately): token counts and per-1,000-word positive, negative, uncertainty rates. Project-defined polarity `(positive-negative)/(positive+negative)` is a *secondary, unvalidated index*; categorical thresholds are project heuristics, not established financial facts.
 6. **Optional local model:** Ollama + Qwen2.5 1.5B, constrained structured output and evidence IDs. In the historical 30-NVIDIA-article pilot 9/30 passed structural/evidence checks, 3/30 needed review and 18/30 failed. These are not independent human accuracy statistics.
