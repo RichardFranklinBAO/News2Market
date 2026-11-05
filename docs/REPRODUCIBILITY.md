@@ -8,9 +8,19 @@ python -m unittest discover -s tests -v
 python -m compileall -q Scripts run_all.py
 ```
 
-Offline tests cover parsing, source selection, LM scoring, synthetic price joining, local model schema/evidence validation, and external RSS/bridge filtering. The historical five-year integration test is **skipped if non-redistributed private CSVs are absent**.
+Offline tests cover parsing, source selection, LM scoring, synthetic price joining, local model schema/evidence validation, and external RSS/bridge filtering. The historical five-year integration test is **skipped if non-redistributed third-party CSVs are absent**.
 
 ## 2. Obtain legitimate research data
+
+**Exact pilot data provenance:**
+
+| Input | Official source | Historical period or version | Local path |
+|---|---|---|---|
+| NVDA daily price | [Nasdaq NVDA historical page](https://www.nasdaq.com/market-activity/stocks/nvda/historical) | **2021-11-05 to 2026-11-04**, daily USD `Close/Last` | `Inputs/prices/NVDA.csv` |
+| QQQ daily benchmark price | [Nasdaq QQQ historical page](https://www.nasdaq.com/market-activity/etf/qqq/historical) | **2021-11-05 to 2026-11-04**, daily USD `Close/Last` | `Inputs/prices/QQQ.csv` |
+| Loughran–McDonald Master Dictionary | [University of Notre Dame SRAF](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) | `Loughran-McDonald_MasterDictionary_1993-2025.csv` (official page updated March 2026) | `Inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv` |
+
+The historical dataset had **1,254 NVDA/QQQ date-matched trading sessions**. The **news collection configuration** is a different period, **2026-08-01 to 2026-11-04**. For an exact historical regression reproduction, preserve the original price CSVs and captured news snapshot; newly fetched articles and downloaded price revisions can differ. The original price field `Close/Last` is **not adjusted for cash dividends**; do not label these as total returns. Publication-time uncertainty limits return interpretation.
 
 * Obtain the official Loughran–McDonald 1993–2025 master dictionary and place it under `Inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv`; check your usage eligibility before downloading.
 * Optional historical empirical mode requires authentic closing-price CSVs in `Inputs/prices/NVDA.csv` and `Inputs/prices/QQQ.csv`; review split/dividend methodology and preserve data-source provenance.
