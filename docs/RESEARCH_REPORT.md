@@ -26,6 +26,14 @@
 
 **Interpretation:** No evidence of a simple linear association in this small observational pilot. The near-zero correlation is not proof of no relationship in general. The quoted standard errors are HC1 rather than autocorrelation-robust, and outcomes are NVDA minus QQQ raw price returns (not risk-adjusted abnormal returns). **Do not claim causal identification or forecast alpha.**
 
+## Low-resource local model implementation
+
+This exploratory model component was run on a **memory-constrained personal Mac**, with approximately **5 GB of available memory** reported during the pilot. The choice of **Ollama + locally served Qwen2.5 1.5B** followed an initial 0.5B trial and prioritized **no paid APIs, practical local inference and error auditing**, rather than state-of-the-art model accuracy. There was no task-specific model training or fine-tuning.
+
+The implemented call uses Ollama's localhost `/api/chat` endpoint, a structured JSON schema, `temperature=0`, `num_ctx=2048`, `num_predict=240`, approximately 1,000 source-text characters, up to five numbered source excerpts, and model-selected evidence IDs verified against source text. A small fixed retry budget and preserved invalid-output/debug records make format/range failures visible. The model predicts direction, numerical tone, event type and a putative economic channel; **valid JSON and a source-matched excerpt are not evidence of economically valid labels**.
+
+This is a **compute-constrained baseline**, not the strongest available model or an independently benchmarked finance NLP system. Proposed, **not yet conducted**, extensions include larger 3B/7B-class models when RAM/VRAM permits, better prompt-independent taxonomies, independent blinded human evaluation, model calibration, richer firm coverage and stronger market-time alignment. Larger models are not assumed superior without comparison. The baseline remains local and free of paid inference APIs.
+
 ## Local LLM audit (Qwen2.5:1.5b)
 
 Thirty articles were processed under a constrained JSON schema and evidence-ID mechanism. **Nine** final labels passed format plus exact-source-span checks, **three** needed manual review, and **eighteen** failed. A common failure was out-of-range `sentiment_score=4` despite a stated valid range of [−1,+1]. `economic_channel` also frequently collapsed to `Investor_Relations`, even for technology and investment stories. Some extracted evidence spans were truncated.
