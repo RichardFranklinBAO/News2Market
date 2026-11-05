@@ -7,9 +7,9 @@ import threading
 import webbrowser
 from urllib.parse import urlparse, parse_qs
 
-from core import ROOT, supported_companies, validate_options, run_pipeline, price_status, import_nasdaq_csv, _reuse_previous_project_csv, lm_dictionary_status
+from .core import ROOT, supported_companies, validate_options, run_pipeline, price_status, import_nasdaq_csv, _reuse_previous_project_csv, lm_dictionary_status
 
-UI_HTML=(ROOT/"ui"/"index.html")
+UI_HTML=(Path(__file__).resolve().parent/"ui"/"index.html")
 LOCK=threading.Lock()
 STATE={"status":"idle","message":"Choose a company to start","lines":[],"report":None}
 

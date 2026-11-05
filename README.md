@@ -56,14 +56,14 @@ The app checks that the file is valid **before** starting the research run. For 
 python -m unittest discover -s tests -v
 ```
 
-The final shared pipeline has **13 offline tests**. With a valid LM CSV present, all 13 passed in the release check; without it, the full integration test is skipped. Offline tests include synthetic fixtures and **are not evidence of live publisher coverage**.
+The final shared pipeline has **15 offline tests**, including checks of the package entrypoint. With a valid LM CSV present, all 15 passed in the release check; without it, the data-dependent integration test is skipped. Offline tests include synthetic fixtures and **are not evidence of live publisher coverage**.
 
 ### Step 4 — Launch the English dashboard and import Nasdaq CSVs
 
 ```bash
-python app.py --web
+python -m news2market --web
 # If port 8765 is already occupied:
-# python app.py --web --port 8766
+# python -m news2market --web --port 8766
 ```
 
 Open **http://127.0.0.1:8765** (or port 8766). Select NVIDIA, Apple or Alphabet/Google. Under **Nasdaq Historical Data**, import (a) the selected company's official daily CSV and (b) the benchmark **QQQ** CSV, each with `Date` and `Close/Last` columns. Confirm the downloaded files' identities and sources; Nasdaq raw CSV exports do not include a ticker identifier. Both price datasets and the LM dictionary should show **Ready**. Files are imported once and then locally reused.
@@ -145,16 +145,19 @@ This project was built **independently on a personal Mac**, using public and fre
 ## Repository Layout
 
 ```text
-app.py                 Single supported CLI/web entrypoint
-core.py                Shared multi-company research pipeline
-web.py                 Local dashboard server
-ui/                    English-language dashboard
-Scripts/               Reused data collectors and text/market analysis modules
-Inputs/                User-installed LM dictionary, Nasdaq CSVs, configuration
-Results/               Per-run research outputs (excluded from Git)
-tests/                 Current pipeline tests
-docs/                  Research report, reproducibility and aggregate pilot figures
+README.md              Research motivation, methods and five-step setup
 requirements.txt       Single dependency manifest
+news2market/           Application package (run with python -m news2market)
+  __main__.py           Python module entry point
+  app.py                Command-line options and runner
+  core.py               Shared company-aware research pipeline
+  web.py                Local dashboard server
+  ui/index.html         English-language dashboard
+Scripts/                Research collection and analysis modules
+Inputs/                 Locally installed LM dictionary and Nasdaq CSVs
+Results/                Per-run outputs (excluded from Git)
+tests/                  Offline pipeline tests
+docs/                   Research evidence, methods and reproducibility
 ```
 
 **Copyright / license:** No source-code license is granted by this repository; a code license should be selected before public reuse. Third-party data and articles remain subject to their respective providers' terms.

@@ -8,7 +8,7 @@ import unittest
 from datetime import date,timedelta
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-import core as v
+from news2market import core as v
 
 
 class CompanySwitchTests(unittest.TestCase):
@@ -127,8 +127,25 @@ class CompanySwitchTests(unittest.TestCase):
             finally:
                 v.INPUTS=original_inputs;v.ROOT=original_root
 
+    def test_package_entrypoint_and_dashboard_asset(self):
+        """Prevent the root-to-package refactor from breaking the public command."""
+        import subprocess
+        from news2market.web import UI_HTML
+        self.assertTrue(UI_HTML.is_file())
+        result=subprocess.run([sys.executable, "-m", "news2market", "--help"],
+               cwd=Path(__file__).resolve().parents[1], check=True,
+               capture_output=True, text=True, timeout=15)
+        self.assertIn("--web", result.stdout)
+        self.assertIn("--ticker", result.stdout)
+
+    def test_clean_package_layout(self):
+        repo=Path(__file__).resolve().parents[1]
+        for old_entry in ("app.py", "core.py", "web.py"):
+            self.assertFalse((repo/old_entry).exists())
+            self.assertTrue((repo/"news2market"/old_entry).exists())
+
     def test_webpage_english_only_and_no_yahoo(self):
-        html=(Path(__file__).resolve().parents[1]/"ui"/"index.html").read_text(encoding="utf-8")
+        html=(Path(__file__).resolve().parents[1]/"news2market"/"ui"/"index.html").read_text(encoding="utf-8")
         self.assertIn('lang="en"',html)
         self.assertIn("Import selected CSV files",html)
         self.assertIn("official Nasdaq",html)

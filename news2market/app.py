@@ -1,12 +1,12 @@
 """News2Market: select one company, click one button, or run one CLI command.
 
-python app.py --web
-python app.py --ticker AAPL --news-days 30 --price-years 5
+python -m news2market --web
+python -m news2market --ticker AAPL --news-days 30 --price-years 5
 """
 from __future__ import annotations
 import argparse
 import json
-from core import run_pipeline, validate_options
+from .core import run_pipeline, validate_options
 
 
 def main():
@@ -22,7 +22,7 @@ def main():
     p.add_argument("--port",type=int,default=8765)
     args=p.parse_args()
     if args.web:
-        from web import start_server
+        from .web import start_server
         start_server(args.port)
         return
     o=validate_options(ticker=args.ticker,news_days=args.news_days,

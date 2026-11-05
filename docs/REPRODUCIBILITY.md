@@ -1,6 +1,6 @@
 # Reproducibility and Data Provenance
 
-The **single current entrypoint** is `python app.py --web` (or `python app.py --ticker NVDA --news-days 30 --price-years 5`). Python 3.11–3.12 is recommended. The app is a local-only dashboard at `127.0.0.1:8765`; use `--port 8766` if that port is occupied.
+The **single current entrypoint** is `python -m news2market --web` (or `python -m news2market --ticker NVDA --news-days 30 --price-years 5`). Python 3.11–3.12 is recommended. The app is a local-only dashboard at `127.0.0.1:8765`; use `--port 8766` if that port is occupied.
 
 ## Clean installation
 
@@ -11,10 +11,10 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
-python app.py --web
+python -m news2market --web
 ```
 
-A private repository requires collaborator access. Run the tests before beginning any external crawl; the 13 current tests were all passing in the build environment with the valid official LM dictionary, while the final data-dependent integration test is skipped when the dictionary is absent.
+A private repository requires collaborator access. Run the tests before beginning any external crawl; the 15 current tests were all passing in the build environment with the valid official LM dictionary, while the final data-dependent integration test is skipped when the dictionary is absent.
 
 ## Research inputs
 
