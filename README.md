@@ -23,6 +23,48 @@ Financial news text is easy to collect and score, but difficult to measure consi
 | Local LLM (optional) | Ollama Qwen2.5 1.5B; evidence-ID audit | Model scores/labels remain unvalidated; errors preserved |
 | Exploratory return analysis | User-provided NVDA / QQQ historical prices, daily aggregation, HC1 OLS | 18 signal days, unknown precise release time, no out-of-sample test |
 
+## Technical implementation and engineering workflow
+
+This is a **modular Python research pipeline**, not just a sentiment-scoring demo. The stages below describe implemented functionality and distinguish demonstrated results from unvalidated research extensions.
+
+| Step | Implemented technique | Main implementation |
+|---|---|---|
+| 1. Study setup and entity resolution | YAML-controlled ticker/benchmark, news dates, SEC CIK matching or NVIDIA-specific collection, run-specific UTC IDs | `Inputs/config.yaml`, `run_all.py`, `Scripts/00_resolve_company.py` |
+| 2. Issuer news acquisition | Requests/BeautifulSoup parsing of NVIDIA Newsroom announcements; optional SEC support | `Scripts/02_scrape_articles.py`, `Scripts/03_collect_filings.py` |
+| 3. Automatic third-party discovery | Search and publisher RSS feeds; XML parsing, date/title relevance filtering, URL normalization, multi-source fallback and deduplication; **no manually seeded article URLs** in the automatic run | `Scripts/15_auto_external_news.py` |
+| 4. Responsible body extraction | Permitted publisher HTML retrieval, `trafilatura` extraction, minimum-length/body checks, source-date audit, 429/403 handling without bypassing protections | `Scripts/03b_scrape_external.py`, `Scripts/15_auto_external_news.py` |
+| 5. Text quality and cleaning | Normalized-URL/text deduplication; preserve raw evidence; identify and trim known first-party boilerplate in a separate cleaned field; compare original versus cleaned scores | `Scripts/04_clean_deduplicate.py`, `Scripts/11_prepare_text.py`, `Scripts/11b_lm_cleaned.py` |
+| 6. Financial lexicon measurement | Official Loughran–McDonald positive/negative dictionary lookups; word counts, missing-value handling, and document-level polarity `(positive - negative)/(positive + negative)` | `Scripts/05_lm_sentiment.py`, `Scripts/lm_dictionary.py` |
+| 7. Optional local LLM labeling | Ollama HTTP inference, Qwen2.5 1.5B, constrained JSON output, event categories, economic-channel labels and numbered excerpts; schema/range/quote audits and retry logs | `Scripts/12_local_llm_labels.py` |
+| 8. Market dataset and alignment | Import user-supplied daily Nasdaq CSVs, parse dates and raw `Close/Last`, join NVDA and QQQ trading days, aggregate news scores, conservatively align outcomes after reported news dates | `Scripts/07_get_prices.py`, `Scripts/08_build_signals.py`, `Scripts/signal_core.py` |
+| 9. Exploratory inference | Pearson correlation, OLS with HC1 heteroskedasticity-robust SE, coefficient/p-value/R² and diagnostic scatterplot; no causal or backtest claims | `Scripts/09_validate.py` |
+| 10. Audit and reproducibility | Per-run CSV/JSON provenance, original input hashes, raw-versus-cleaned measurement, model-failure preservation, isolated external runs, offline unit tests and documentation | `Results/<TICKER>/<UTC_run_id>/`, `tests/`, `docs/` |
+
+**Software stack:** Python 3.11–3.12; `requests`, `beautifulsoup4`, `trafilatura` and Python XML parsing for news collection; `pandas`/`numpy` for tables and numeric operations; `statsmodels` for regression; `matplotlib` for plots; `PyYAML` for configuration; Ollama for **optional, local-only** model inference. No paid LLM/API calls were used.
+
+## Local LLM choice, constrained hardware, and future scaling
+
+**What was actually tested.** Development took place on a personal Mac with limited available memory (approximately **5 GB available** during the pilot). To stay within this practical resource budget and avoid paid inference, the experiment used [Ollama](https://ollama.com/) to run **`qwen2.5:1.5b` locally**, after initially experimenting with **`qwen2.5:0.5b`**. The 1.5B model was a **hardware-constrained proof of concept**, **not a claim that 1.5B is state of the art or the optimal finance model**. The model itself is not trained or fine-tuned by this project.
+
+**Implementation detail.** `Scripts/12_local_llm_labels.py` calls the local Ollama chat endpoint `http://127.0.0.1:11434/api/chat` via HTTP and asks for a constrained JSON object. In the reported configuration it used `temperature=0`, `num_ctx=2048`, `num_predict=240`, and an approximately **1,000-character** article input budget. Python constructs up to **five numbered original-text excerpts**; the model chooses an `evidence_id`, and Python retrieves that exact excerpt instead of trusting a model-generated quotation. It records the model ID, prompt version, input hash, retries, response errors and flags for invalid evidence or scores. This limits some formatting errors, **but does not establish that a selected quote supports the economic interpretation**.
+
+**Measured limitations.** In the 30-article NVIDIA issuer-news pilot using the 1.5B model, **9/30** final labels passed structural/evidence checks, **3/30** required review, and **18/30** failed, often because the model generated a score outside the allowed `[-1,+1]` range (such as `4`). Economic-channel labels also repeatedly collapsed to `Investor_Relations`, and some chosen evidence excerpts were truncated. Invalid scores were **kept missing**, not clipped to valid numbers. These model labels **were not used as validated predictors in the reported market regression**; that regression used LM dictionary measurements. Small-model output should not be equated with research-grade economic truth.
+
+**Future work (not implemented or benchmarked here):** compare larger local models (e.g., 3B/7B and larger, where adequate RAM/VRAM/compute is available), use stronger event/category taxonomies, obtain independent blinded human labels, evaluate per-class agreement and calibration, and investigate better publication-time alignment and out-of-sample evaluation. Any future cloud or paid model experiments would be explicitly labeled separately from this **zero-paid-API** baseline. Larger models may help, but their superiority has **not** been established by this pilot.
+
+**Reproduce the exact reported model choice:**
+
+```bash
+# Install Ollama from https://ollama.com/ first.
+ollama pull qwen2.5:1.5b
+# Optional; the default third-party pipeline runs LM scoring without Ollama:
+python Scripts/16_auto_news_research.py \
+  --ticker NVDA --query NVIDIA --days 30 --max-external 5 \
+  --local-llm --llm-model qwen2.5:1.5b
+```
+
+For the historical issuer-news runner, **explicitly specify** `--llm-model qwen2.5:1.5b`; the older runner retains a different legacy default. Available memory and model performance depend on local hardware, and a fresh online crawl will not necessarily yield the same news articles.
+
 ## Data sources and exact pilot date ranges
 
 The pilot uses **publicly accessible third-party data acquired from the original providers**. These are not included in the GitHub repository; users must download them under the providers' terms.
