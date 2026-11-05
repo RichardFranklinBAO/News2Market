@@ -103,6 +103,24 @@ Company/name filters are heuristic and require manual inspection for ambiguous m
 
 **Stack:** Python, `requests`, BeautifulSoup, `trafilatura`, XML/RSS parsing, `pandas`, NumPy, `statsmodels` (HC1 OLS), Matplotlib, JSON/CSV outputs, `PyYAML` configuration, and optional local [Ollama](https://ollama.com/) with **`qwen2.5:1.5b`**. No paid LLM API, cloud model, hosted dashboard or user account is required.
 
+## Optional Local LLM Experiment and Future Model APIs
+
+**What Ollama does:** [Ollama](https://ollama.com/) is a **local model-serving runtime**, not the language model itself. In this pilot, Ollama runs the pretrained **Qwen2.5 1.5B** model on a personal Mac. After the pipeline extracts a news article, the optional LLM stage asks Qwen to suggest **(i) sentiment direction and score, (ii) an economic event type, (iii) a possible economic transmission channel, and (iv) an evidence ID tied to a source-text excerpt**. The Python code checks output structure, permissible values and evidence links. These are **experimental annotations**, not independently validated economic interpretations or causal effects.
+
+**Why it is optional:** The core workflow—company-aware news discovery, permitted full-text extraction, Loughran–McDonald (LM) lexicon measurement, Nasdaq/QQQ data alignment and exploratory statistical analysis—**works without Ollama**. Ollama/Qwen adds a separate attempt at **context-aware economic event labeling** beyond simple word counts. Given the limited compute available during independent development, 1.5B was chosen as a **resource-constrained proof of concept**, not a claim of optimal accuracy. In the 30-article NVIDIA audit, only **9** outputs passed structural/evidence checks, **3** needed review and **18** failed. Even a structurally valid label may be economically incorrect; these labels are not validated market predictors.
+
+**Optional local setup (not required for the five-step Quick Start):**
+
+```bash
+# Install Ollama separately from https://ollama.com/download, then:
+ollama pull qwen2.5:1.5b
+python -m news2market --web
+```
+
+Enable **Local LLM** in the dashboard only after Ollama is installed and the model has been pulled. No paid API key is needed for this local mode. The repository **does not download Ollama or ship model weights**.
+
+**Potential future extension — hosted model APIs:** With appropriate funding, permitted data access and independent benchmarks, the architecture could support an **OpenAI API** adapter (or other hosted LLM services) in addition to Ollama. That would permit comparison of more capable models on event classification, economic-channel interpretation, evidence faithfulness, output validity and inference cost. **This is a proposed extension only: no OpenAI API integration, paid model calls or cross-model accuracy comparison is implemented or reported.** Hosted inference would introduce API charges and require reviewing news-text licensing, data-sharing/privacy requirements and reproducibility. Larger or hosted models **might** improve annotation quality, but improvement must be demonstrated against independently reviewed labels rather than assumed.
+
 ## Data Sources and Measurement Definitions
 
 | Input | Official source | Pilot / version |
