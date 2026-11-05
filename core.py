@@ -1,4 +1,4 @@
-"""News2Market v3 three-company MVP: additive integration; existing v2 runs untouched.
+"""News2Market: reproducible three-company research workbench.
 
 Needs existing Scripts/ directory and locally installed official LM dictionary.
 The reported price/return analysis is exploratory, not a trading model.
@@ -156,7 +156,7 @@ def _candidate_filter(candidates, profile):
 def discover_news(profile, ticker, from_day, to_day, max_news, use_proxy=False, log=print):
     """News download: existing RSS/publisher extractor plus optional NVIDIA archive adapter."""
     scripts_on_path()
-    rss = import_numeric_script("15_auto_external_news.py", "n2m_v3_rss")
+    rss = import_numeric_script("15_auto_external_news.py", "n2m_rss_collector")
     import requests
 
     collected=[];audit={"rss_feeds":[],"excluded_candidates":[],"nvidia_issuer_error":None,
@@ -238,7 +238,7 @@ def discover_news(profile, ticker, from_day, to_day, max_news, use_proxy=False, 
 
 def _read_price_csv(path, symbol):
     scripts_on_path()
-    mod=import_numeric_script("07_get_prices.py","n2m_v3_prices_import")
+    mod=import_numeric_script("07_get_prices.py","n2m_market_import")
     rows,kind=mod.parse_price_csv(path)
     return {r["date"]:float(r["close"]) for r in rows}, kind
 
@@ -490,7 +490,7 @@ def prices_for_pair(ticker,start,end,price_mode="auto",log=print):
 def subprocess_stage(script,run_dir,ticker,date_start,date_end,log=print,env_extra=None,allow_error=False):
     if script not in SCRIPT_NAMES|{"12_local_llm_labels.py"}:
         raise ValueError("Unknown fixed stage")
-    ctx={"ticker":ticker,"benchmark":BENCHMARK,"mode":"live", "source":"v3_multicompany",
+    ctx={"ticker":ticker,"benchmark":BENCHMARK,"mode":"live", "source":"company_aware_news",
          "start_date":date_start,"end_date":date_end}
     context_path=run_dir/"context.json"
     write_json(context_path,ctx)
@@ -561,7 +561,7 @@ def _news_summary(run_dir,article_rows):
               "polarity_hits":int(s.get("lm_polarity_hits",0)),
               "cleaned_polarity":float(c["lm_clean_score"]) if c.get("lm_clean_score") else None,
               "time_quality":a.get("published_time_quality","unknown")})
-    write_csv(run_dir/"v3_news_summary.csv",rows,["article_id","title","date","source","source_type","url",
+    write_csv(run_dir/"news_summary.csv",rows,["article_id","title","date","source","source_type","url",
        "polarity","positive_per_1000","negative_per_1000","uncertainty_per_1000",
        "polarity_hits","cleaned_polarity","time_quality"])
     return rows
@@ -578,10 +578,10 @@ def run_pipeline(options, log=print, news_loader=None, price_loader=None, root_o
     news_start=today-timedelta(days=opt["news_days"])
     price_start=subtract_years(today,opt["price_years"])
     runid=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    base=(Path(root_output) if root_output is not None else RESULTS)/ticker/"V3"
+    base=(Path(root_output) if root_output is not None else RESULTS)/ticker/"Runs"
     run=base/runid
     run.mkdir(parents=True,exist_ok=False)
-    report={"version":"News2Market_v3_three_company_MVP","ticker":ticker,"company":company["name"],
+    report={"version":"News2Market_research_workbench","ticker":ticker,"company":company["name"],
        "benchmark":BENCHMARK,"status":"running","run_id":runid,"run_folder":str(run),
        "options":opt,"dates":{"news_start":news_start.isoformat(),"news_end":today.isoformat(),
        "prices_start":price_start.isoformat(),"prices_end":today.isoformat()},
@@ -590,7 +590,7 @@ def run_pipeline(options, log=print, news_loader=None, price_loader=None, root_o
        "Company relevance filtering is lexical and requires human review",
        "LM is a financial lexicon measure, not the signed surprise to investors",
        "Nasdaq CSVs are downloaded and imported by the user; automatic Nasdaq scraping is not enabled"],"warnings":[]}
-    write_json(run/"v3_report.json",report)
+    write_json(run/"research_report.json",report)
     try:
         log(f"Company: {ticker} — {company['name']}; benchmark: {BENCHMARK}")
         # Nasdaq-only market data first. Reuse verified local CSVs; never create synthetic data.
@@ -623,7 +623,7 @@ def run_pipeline(options, log=print, news_loader=None, price_loader=None, root_o
             cleaned.append(a)
             if len(cleaned)>=opt["max_news"]:break
         write_csv(run/"04_articles.csv",cleaned,fields)
-        write_json(run/"v3_news_audit.json",news_audit)
+        write_json(run/"news_audit.json",news_audit)
         report["news"]={"count":len(cleaned),"audit":news_audit}
         log(f"Qualified article bodies: {len(cleaned)}")
         if cleaned:
@@ -658,8 +658,8 @@ def run_pipeline(options, log=print, news_loader=None, price_loader=None, root_o
     except Exception as exc:
         report["status"]="failed"
         report["error"]=f"{type(exc).__name__}: {str(exc)[:550]}"
-        write_json(run/"v3_report.json",report)
+        write_json(run/"research_report.json",report)
         raise RuntimeError(f"{report['error']} | partial run preserved: {run}") from exc
-    write_json(run/"v3_report.json",report)
+    write_json(run/"research_report.json",report)
     log(f"COMPLETE: {run}")
     return report

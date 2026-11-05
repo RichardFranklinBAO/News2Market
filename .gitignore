@@ -21,6 +21,9 @@ __pycache__/
 *.xlsx
 .DS_Store
 
-# Imported/auto-reused Nasdaq provenance varies between local machines
+# Final project: virtual environment, local data manifests, temporary inputs
+.venv/
+venv/
 Inputs/prices/SOURCE_MANIFEST.json
 Inputs/prices/.*.tmp
+Inputs/.*.tmp

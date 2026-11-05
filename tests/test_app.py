@@ -1,4 +1,4 @@
-"""Offline tests for News2Market v3; synthetic fixtures are ONLY test fixtures."""
+"""Offline tests for News2Market final application; synthetic fixtures are ONLY test fixtures."""
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -8,7 +8,7 @@ import unittest
 from datetime import date,timedelta
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-import v3_core as v
+import core as v
 
 
 class CompanySwitchTests(unittest.TestCase):
@@ -79,7 +79,7 @@ class CompanySwitchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             original_root=v.ROOT;original_inputs=v.INPUTS
             base=Path(tmp); old_prices=base/"News2Market"/"Inputs"/"prices";old_prices.mkdir(parents=True)
-            fresh=base/"News2Market_v3_1_Nasdaq_English";fresh.mkdir()
+            fresh=base/"News2Market_A";fresh.mkdir()
             sample="Date,Close/Last\n11/02/2026,$100\n11/03/2026,$101\n11/04/2026,$102\n"
             manifest={}
             for symbol in ("NVDA","QQQ"):
@@ -111,7 +111,7 @@ class CompanySwitchTests(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError,"Official LM dictionary"):
                         v.run_pipeline(v.validate_options(),news_loader=fail_if_called,
                             price_loader=fail_if_called,root_output=tmp,log=lambda msg:None)
-                self.assertFalse((Path(tmp)/"NVDA"/"V3").exists())
+                self.assertFalse((Path(tmp)/"NVDA"/"Runs").exists())
             finally:
                 v.INPUTS=original
 
@@ -119,7 +119,7 @@ class CompanySwitchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             original_inputs,original_root=v.INPUTS,v.ROOT
             try:
-                v.INPUTS=Path(tmp)/"Inputs";v.ROOT=Path(tmp)/"News2Market_v3"
+                v.INPUTS=Path(tmp)/"Inputs";v.ROOT=Path(tmp)/"News2Market_B"
                 result=v.lm_dictionary_status()
                 self.assertFalse(result["ready"])
                 self.assertEqual(result["source"],"missing")
@@ -128,7 +128,7 @@ class CompanySwitchTests(unittest.TestCase):
                 v.INPUTS=original_inputs;v.ROOT=original_root
 
     def test_webpage_english_only_and_no_yahoo(self):
-        html=(Path(__file__).resolve().parents[1]/"v3_ui"/"index.html").read_text(encoding="utf-8")
+        html=(Path(__file__).resolve().parents[1]/"ui"/"index.html").read_text(encoding="utf-8")
         self.assertIn('lang="en"',html)
         self.assertIn("Import selected CSV files",html)
         self.assertIn("official Nasdaq",html)
@@ -182,7 +182,7 @@ class FullPipelineTests(unittest.TestCase):
                 self.assertGreater(report["prices"]["audit"]["matched_sessions"],20)
                 self.assertTrue((Path(report["run_folder"])/"05_lm_labels.csv").exists())
                 self.assertTrue((Path(report["run_folder"])/"07_prices.csv").exists())
-                self.assertTrue((Path(report["run_folder"])/"v3_report.json").exists())
+                self.assertTrue((Path(report["run_folder"])/"research_report.json").exists())
                 self.assertNotEqual(report["prices"]["audit"]["provider"],"yahoo_yfinance")
 
 

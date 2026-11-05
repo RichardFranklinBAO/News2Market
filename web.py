@@ -7,9 +7,9 @@ import threading
 import webbrowser
 from urllib.parse import urlparse, parse_qs
 
-from v3_core import ROOT, supported_companies, validate_options, run_pipeline, price_status, import_nasdaq_csv, _reuse_previous_project_csv, lm_dictionary_status
+from core import ROOT, supported_companies, validate_options, run_pipeline, price_status, import_nasdaq_csv, _reuse_previous_project_csv, lm_dictionary_status
 
-UI_HTML=(ROOT/"v3_ui"/"index.html")
+UI_HTML=(ROOT/"ui"/"index.html")
 LOCK=threading.Lock()
 STATE={"status":"idle","message":"Choose a company to start","lines":[],"report":None}
 
@@ -40,7 +40,7 @@ def worker(opt):
 
 
 class LocalHandler(BaseHTTPRequestHandler):
-    server_version="News2MarketLocal/3.0"
+    server_version="News2MarketLocal/1.0"
 
     def _send(self,body,status=200,mime="application/json; charset=utf-8"):
         self.send_response(status)
@@ -126,7 +126,7 @@ def start_server(port=8765):
     if not UI_HTML.exists():raise FileNotFoundError(f"Missing dashboard: {UI_HTML}")
     server=ThreadingHTTPServer(("127.0.0.1",port),LocalHandler)
     url=f"http://127.0.0.1:{port}/"
-    print(f"News2Market v3 local dashboard: {url}\nPress Ctrl+C to stop.",flush=True)
+    print(f"News2Market local research dashboard: {url}\nPress Ctrl+C to stop.",flush=True)
     webbrowser.open(url)
     try:
         server.serve_forever(poll_interval=0.5)
