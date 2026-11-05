@@ -1,20 +1,16 @@
 # Changelog
 
-## 2026-11-05 — Research portfolio publication draft
-- Added automatic external RSS discovery (Script 15) and standalone LM bridge (Script 16).
-- Updated README, research report, provenance and data redistribution instructions.
-- Adapted offline tests to latest local LLM evidence-ID schema.
-- Kept private market data, the original LM dictionary and scraped news text out of the public package.
-- No claim of verified intraday timestamps, independently validated model accuracy, or trading return predictability.
+## v3.1.1 — GitHub release: preflight and research transparency
 
-# Changelog
+- Preserve the v3.1 three-company English dashboard (NVDA, AAPL, GOOGL) and Nasdaq-only local CSV workflow.
+- Check the official Loughran–McDonald dictionary before price/news retrieval. Reuse a validated copy from a sibling local project when available; otherwise show a clear English setup error and official download link. Never bundle third-party dictionary bytes.
+- Display LM dictionary prerequisite status in the local dashboard.
+- Expand README `Limitations and resource-constrained development` with hardware, licensing, news coverage, model-quality, methodology and future-scaling limitations. No performance promises.
+- Preserve the initial NVIDIA v2 report, figure and research reproducibility notes.
+- Move the historical price-source manifest to `docs/`; ignore locally updated runtime price manifest to avoid accidental commits.
 
-## v2.1 — 5-Year Nasdaq CSV Support (2026-11-05)
-- Added user-provided 5-year Nasdaq NVDA and QQQ raw historical CSVs to personal deliverable (not for public GitHub redistribution).
-- Direct support for `MM/DD/YYYY`, `$` currency symbols, reverse chronological order, `Close/Last`, and both original ISO and adjusted formats.
-- Added strict CSV validation, SHA256 input provenance, coverage and unmatched-session audits, and explicit disclosure of Close/Last dividend adjustment limits.
-- Tests include 5-year 1,254-session alignment and June 2024 NVDA split-scale continuity.
-- No new paid services, APIs or web price requests.
+## v3.1 — Nasdaq-only English dashboard
 
-## v2.0 — Free ticker-aware pipeline
-- Added SEC identity, NVDA Newsroom, local real-price CSV, LM and stage resume.
+- Replace Yahoo as price provider with manually imported, source-verified Nasdaq historical CSV files.
+- Keep optional per-ticker CSV auto-reuse from an existing local project.
+- English local interface and a unified three-company research command.

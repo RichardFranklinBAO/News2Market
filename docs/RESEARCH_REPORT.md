@@ -1,3 +1,15 @@
+# News2Market research report — v3.1 workbench and historical v2 evidence
+
+## v3.1 scope and research status
+
+The current one-stop **English local dashboard** selects NVIDIA (NVDA), Apple (AAPL) or Google/Alphabet Class A (GOOGL). The **same codepath** handles validated Nasdaq CSV input for the selected equity and QQQ, issuer and third-party RSS/news collection, official LM dictionary scores, optional local Ollama Qwen2.5 1.5B audit labels and exploratory alignment with later price returns. Full online coverage and empirical findings for **all three** have **not** been established. The current v2 NVIDIA result below must not be generalized to Apple or Alphabet.
+
+**Practical constraints:** The project was developed on a personal computer using zero-paid-API resources. The official LM dictionary is not bundled because use permissions do not automatically confer redistribution rights. A v3.1 startup preflight now detects a missing dictionary and attempts safe reuse from an existing local sibling installation before any news crawl. Nasdaq data still require user-authorized downloaded CSVs. Hardware limits restrict local language-model scale, while feed availability, day-level timing, sparse labels and lack of human ground truth limit research conclusions. More licensed data, compute and validation could support larger-scale research, but no gains are claimed before testing.
+
+---
+
+## Historical v2 NVIDIA issuer-news pilot (preserved)
+
 # News2Market — Exploratory Research Report
 
 **Pilot completed:** 2026-11-05  
@@ -25,14 +37,6 @@
 ![Historical issuer-news exploratory regression scatterplot](figures/09_signal_vs_return.png)
 
 **Interpretation:** No evidence of a simple linear association in this small observational pilot. The near-zero correlation is not proof of no relationship in general. The quoted standard errors are HC1 rather than autocorrelation-robust, and outcomes are NVDA minus QQQ raw price returns (not risk-adjusted abnormal returns). **Do not claim causal identification or forecast alpha.**
-
-## Low-resource local model implementation
-
-This exploratory model component was run on a **memory-constrained personal Mac**, with approximately **5 GB of available memory** reported during the pilot. The choice of **Ollama + locally served Qwen2.5 1.5B** followed an initial 0.5B trial and prioritized **no paid APIs, practical local inference and error auditing**, rather than state-of-the-art model accuracy. There was no task-specific model training or fine-tuning.
-
-The implemented call uses Ollama's localhost `/api/chat` endpoint, a structured JSON schema, `temperature=0`, `num_ctx=2048`, `num_predict=240`, approximately 1,000 source-text characters, up to five numbered source excerpts, and model-selected evidence IDs verified against source text. A small fixed retry budget and preserved invalid-output/debug records make format/range failures visible. The model predicts direction, numerical tone, event type and a putative economic channel; **valid JSON and a source-matched excerpt are not evidence of economically valid labels**.
-
-This is a **compute-constrained baseline**, not the strongest available model or an independently benchmarked finance NLP system. Proposed, **not yet conducted**, extensions include larger 3B/7B-class models when RAM/VRAM permits, better prompt-independent taxonomies, independent blinded human evaluation, model calibration, richer firm coverage and stronger market-time alignment. Larger models are not assumed superior without comparison. The baseline remains local and free of paid inference APIs.
 
 ## Local LLM audit (Qwen2.5:1.5b)
 

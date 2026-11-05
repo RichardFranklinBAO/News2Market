@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>News2Market | Research Workbench</title>
+<style>
+:root{color-scheme:dark;--bg:#080c18;--card:#131a2b;--border:#293348;--ink:#f0f4ff;--muted:#a5b3ca;--teal:#59e5c8;--warn:#ffbf71;--pink:#ff809e}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 88% -14%,#1b3144,transparent 48%),var(--bg);color:var(--ink);font:15px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
+main{max-width:1130px;margin:0 auto;padding:40px 22px 70px}.eyebrow{letter-spacing:.18em;text-transform:uppercase;color:var(--teal);font-size:11px;font-weight:800}
+h1{font-size:clamp(35px,5vw,60px);letter-spacing:-.05em;margin:12px 0 8px;line-height:1.1}h1 span{color:var(--teal)}.sub{color:var(--muted);max-width:720px;margin:0 0 28px}
+.panel{background:rgba(19,26,43,.92);border:1px solid var(--border);border-radius:17px;padding:24px;margin:18px 0;box-shadow:0 14px 50px #0002}.setup{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:13px}.setup label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}.setup select{width:100%;background:#0c1424;color:var(--ink);border:1px solid #3b4660;border-radius:9px;font-size:14px;padding:12px 9px}
+.controls{display:flex;gap:20px;flex-wrap:wrap;margin-top:18px;align-items:center;color:var(--muted);font-size:13px}.controls label{cursor:pointer}input[type=checkbox]{accent-color:var(--teal);vertical-align:middle}.primary{appearance:none;border:0;background:var(--teal);color:#072b26;border-radius:10px;padding:13px 20px;font-weight:850;cursor:pointer;white-space:nowrap}.primary:disabled{opacity:.5;cursor:wait}.toprow{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:4px}
+.pill{font-size:12px;color:#b7fbec;border:1px solid #237261;border-radius:999px;padding:5px 12px;background:#0b302e}section h2{font-size:17px;margin:0 0 12px}.track{height:8px;border-radius:99px;background:#29394d;overflow:hidden;margin:15px 0}.progress{height:100%;width:0;background:linear-gradient(90deg,#41becc,#65f4b9);transition:width .5s}.trace{color:#b6c8d8;white-space:pre-wrap;font:12px/1.75 ui-monospace,Menlo,monospace;max-height:190px;overflow:auto;margin:0;background:#0b1220;border:1px solid var(--border);padding:12px;border-radius:9px}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric{padding:16px;border:1px solid var(--border);border-radius:11px;background:#101729}.metric .v{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.4}.metric .k{color:var(--muted);font-size:12px}.fine{font-size:12px;color:var(--muted)}.err{color:var(--pink)}.warn{color:var(--warn)}.ok{color:var(--teal)}.hidden{display:none!important}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;border-bottom:1px solid var(--border);padding:11px 9px;vertical-align:top}th{color:#9aacc8;font-weight:600}td a{color:#87e5d6;text-decoration:none}td a:hover{text-decoration:underline}.tablewrap{overflow-x:auto}canvas{width:100%;height:205px;background:#0d1627;border-radius:10px;border:1px solid var(--border)}footer{font-size:12px;color:var(--muted);padding-top:24px;max-width:850px}
+@media(max-width:760px){.setup{grid-template-columns:1fr 1fr}.cards{grid-template-columns:1fr 1fr}main{padding:24px 14px}.panel{padding:16px}.primary{width:100%}}
+</style></head><body><main>
+<div class="eyebrow">Local research workbench · v3 MVP · 100% local UI</div>
+<h1>News<span>2</span>Market</h1><p class="sub">Select a company, import official Nasdaq historical CSVs once, and run a unified local research workflow: discover public news, extract permitted article text, measure financial tone, and inspect exploratory return associations.</p>
+<section class="panel"><div class="toprow"><h2>01 / Research configuration</h2><span class="pill">3-company pilot</span></div>
+<div class="setup"><div><label for="ticker">Company / ticker</label><select id="ticker"><option value="NVDA">NVIDIA · NVDA</option><option value="AAPL">Apple · AAPL</option><option value="GOOGL">Google / Alphabet · GOOGL</option></select></div>
+<div><label for="news_days">Recent news window</label><select id="news_days"><option value="14">14 days</option><option value="30" selected>30 days</option><option value="60">60 days</option><option value="90">90 days</option></select></div>
+<div><label for="price_years">Price history window</label><select id="price_years"><option value="1">1 year</option><option value="3">3 years</option><option value="5" selected>5 years</option></select></div>
+<div><label for="max_news">Maximum full-text articles</label><select id="max_news"><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option></select></div></div>
+<div class="controls"><label><input type="checkbox" id="local_llm"> Optional local Qwen2.5 1.5B labeling (experimental; requires review)</label><label><input type="checkbox" id="use_proxy"> Use locally configured network proxy</label>
+<label>Historical price source <select id="price_mode"><option value="auto">Nasdaq CSV · auto-reuse verified files</option><option value="nasdaq_csv">Nasdaq CSV · this project only</option></select></label><button class="primary" id="go" type="button">Run research →</button></div>
+<p class="fine">GOOGL is Alphabet Class A equity; QQQ is the benchmark. Historical market coverage does not imply matching historical news coverage. This workbench runs locally only.</p>
+</section>
+<section class="panel" id="nasdaq_data"><div class="toprow"><h2>02 / Nasdaq historical data</h2><span class="pill">No Yahoo</span></div>
+<p class="fine">Only user-downloaded Nasdaq <code>Close/Last</code> CSV files are accepted. Previously verified files in a sibling <code>News2Market</code> folder can be reused automatically. Nasdaq's website restricts unauthorized automated extraction, so this tool does not scrape its download endpoint.</p>
+<div class="setup" style="grid-template-columns:repeat(2,minmax(0,1fr));margin:14px 0">
+<div><label>Selected stock historical data</label><a id="ticker_link" href="https://www.nasdaq.com/market-activity/stocks/nvda/historical" target="_blank" rel="noopener noreferrer">Open Nasdaq stock data page</a><input style="width:100%;margin-top:10px" type="file" id="asset_csv" accept=".csv,text/csv"><div class="fine" id="asset_status">Checking saved data…</div></div>
+<div><label>QQQ benchmark historical data</label><a href="https://www.nasdaq.com/market-activity/etf/qqq/historical" target="_blank" rel="noopener noreferrer">Open Nasdaq QQQ data page</a><input style="width:100%;margin-top:10px" type="file" id="benchmark_csv" accept=".csv,text/csv"><div class="fine" id="benchmark_status">Checking saved data…</div></div>
+</div>
+<div class="controls"><label><input id="confirm_nasdaq" type="checkbox"> I confirm these files were downloaded from the official Nasdaq historical data pages.</label>
+<button id="import_prices" class="primary" type="button">Import selected CSV files</button><button type="button" id="refresh_prices">Check saved data</button></div>
+<p class="fine" id="price_import_result">Files are stored locally under <code>Inputs/prices/</code>. Nasdaq files usually contain no ticker column; verify each filename/source before importing. Both the stock and QQQ files are required for return analysis.</p>
+<p class="fine" id="dictionary_status">Checking the official Loughran–McDonald dictionary…</p>
+</section>
+<section class="panel"><div class="toprow"><h2>03 / Execution</h2><span id="state">IDLE</span></div><div id="status_line" class="fine">Choose a ticker and run the workflow.</div><div class="track"><div id="bar" class="progress"></div></div><pre class="trace" id="trace">No run yet.</pre></section>
+<div id="results" class="hidden">
+<section class="panel"><div class="toprow"><h2>04 / Research output</h2><span class="pill" id="run_status">Complete</span></div>
+<div class="cards"><div class="metric"><div class="v" id="m_ticker">—</div><div class="k">Company</div></div><div class="metric"><div class="v" id="m_days">—</div><div class="k">Matched price sessions</div></div><div class="metric"><div class="v" id="m_news">—</div><div class="k">Full-text articles</div></div><div class="metric"><div class="v" id="m_signal">—</div><div class="k">Aligned signal days</div></div></div>
+<p class="fine" id="provider_note"></p><p class="fine" id="analysis_note"></p><p class="fine" id="file_note"></p>
+<div class="toprow"><h2>Price history</h2><span class="fine">Closing prices · relative scale</span></div><canvas id="chart" width="880" height="220"></canvas><p class="fine">Both prices are indexed to 100 at the first displayed date. Provider's raw Close specification is recorded in each run's audit.</p>
+</section>
+<section class="panel"><h2>05 / Financial lexicon measurements</h2><p class="fine">LM Polarity = (positive − negative) / (positive + negative). Primary transparent alternatives: counts per 1,000 words. Scores are <strong>not</strong> estimates of stock-price surprises.</p>
+<div class="tablewrap"><table><thead><tr><th>Date</th><th>Headline</th><th>Source</th><th>Polarity</th><th>Negative / 1k</th><th>Uncertainty / 1k</th></tr></thead><tbody id="articles"></tbody></table></div>
+</section></div>
+<footer>Research prototype only. RSS sources may timeout or restrict access; no paywall, CAPTCHA or rate-limit bypass. Invalid LLM scores remain unvalidated. Unverified intraday news times prevent causal or same-day event-study claims. The Nasdaq Close/Last series is not adjusted for cash dividends. Nasdaq data must be obtained under the provider's terms.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);let active=false;let pollHandle=null;
+const historicalLinks={NVDA:'https://www.nasdaq.com/market-activity/stocks/nvda/historical',AAPL:'https://www.nasdaq.com/market-activity/stocks/aapl/historical',GOOGL:'https://www.nasdaq.com/market-activity/stocks/googl/historical'};
+async function refreshPrices(){
+  const ticker=$('ticker').value;
+  $('ticker_link').href=historicalLinks[ticker];$('ticker_link').textContent=`Open Nasdaq ${ticker} historical data`;
+  for(const id of ['asset_status','benchmark_status'])$(id).textContent='Checking saved Nasdaq CSV…';
+  try{
+    const r=await fetch(`/api/prices?ticker=${encodeURIComponent(ticker)}`,{cache:'no-store'});
+    const j=await r.json();if(!r.ok)throw Error(j.error||'Could not inspect saved data');
+    for(const [symbol,target] of [[ticker,'asset_status'],['QQQ','benchmark_status']]){
+      const f=j.files[symbol];$(target).textContent=f.ready?`Ready: ${f.rows||'?'} rows (${f.first_date} to ${f.last_date})`:`Missing verified Nasdaq ${symbol}.csv — import it below.`;
+      $(target).className=f.ready?'fine ok':'fine warn';
+    }
+    const lm=j.lm_dictionary||{};
+    $('dictionary_status').textContent=lm.ready
+      ?'LM dictionary: ready in this project.'
+      :(lm.available_to_reuse
+        ?'LM dictionary: available in an existing local News2Market project; it will be validated and reused when you run research.'
+        :'LM dictionary: missing. Download the official 1993–2025 CSV from Notre Dame before running research.');
+    $('dictionary_status').className=lm.ready||lm.available_to_reuse?'fine ok':'fine warn';
+  }catch(e){$('price_import_result').textContent=String(e)}
+}
+$('ticker').addEventListener('change',refreshPrices);
+$('refresh_prices').onclick=refreshPrices;
+$('import_prices').onclick=async()=>{
+  if(active)return;
+  const files=[[$('ticker').value,$('asset_csv').files[0]],['QQQ',$('benchmark_csv').files[0]]].filter(x=>x[1]);
+  if(!files.length){$('price_import_result').textContent='Choose at least one Nasdaq CSV file.';return;}
+  if(!$('confirm_nasdaq').checked){$('price_import_result').textContent='Please confirm that the CSV files came from Nasdaq.';return;}
+  $('import_prices').disabled=true;
+  try{
+    let lines=[];
+    for(const [symbol,file] of files){
+      if(file.size>2000000)throw Error(`${symbol}: CSV exceeds the 2 MB limit`);
+      const response=await fetch('/api/import-price',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({symbol,csv_text:await file.text(),confirmed_nasdaq:true})});
+      const json=await response.json();if(!response.ok)throw Error(`${symbol}: ${json.error||'Import failed'}`);
+      lines.push(`${symbol}: ${json.result.row_count} Nasdaq price rows imported (${json.result.first_date} to ${json.result.last_date})`);
+    }
+    $('price_import_result').textContent=lines.join(' | ');
+    $('asset_csv').value='';$('benchmark_csv').value='';$('confirm_nasdaq').checked=false;
+    await refreshPrices();
+  }catch(e){$('price_import_result').textContent=String(e)}
+  finally{$('import_prices').disabled=false;}
+};
+function el(tag,text,attrs={}){const x=document.createElement(tag);x.textContent=text;for(const[k,v]of Object.entries(attrs))x.setAttribute(k,v);return x;}
+function fmt(x,d=3){return x===null||x===undefined||x===''?'—':Number(x).toFixed(d);}
+async function readState(){const r=await fetch('/api/state',{cache:'no-store'});if(!r.ok)throw Error('Local server unavailable');return r.json();}
+function chart(points,ticker){const c=$('chart'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#0d1627';ctx.fillRect(0,0,w,h);const p=(points||[]).filter(x=>x[`${ticker}_close`]>0&&x.QQQ_close>0);if(p.length<2){ctx.fillStyle='#a5b3ca';ctx.fillText('Not enough price observations',24,30);return;}
+const a0=p[0][`${ticker}_close`],b0=p[0].QQQ_close;const ys=[...p.map(x=>100*x[`${ticker}_close`]/a0),...p.map(x=>100*x.QQQ_close/b0)];const min=Math.min(...ys),max=Math.max(...ys);const top=max===min?max+1:max,bot=max===min?min-1:min;const X=i=>42+i*(w-65)/(p.length-1),Y=v=>h-24-(v-bot)/(top-bot)*(h-54);
+ctx.strokeStyle='#23364f';ctx.lineWidth=1;for(let j=0;j<5;j++){const yy=24+j*(h-48)/4;ctx.beginPath();ctx.moveTo(36,yy);ctx.lineTo(w-12,yy);ctx.stroke();}
+for(const [key,clr]of [[`${ticker}_close`,'#56e8ce'],['QQQ_close','#efad7d']]){ctx.beginPath();ctx.strokeStyle=clr;ctx.lineWidth=2;for(let i=0;i<p.length;i++){const val=100*p[i][key]/(key==='QQQ_close'?b0:a0);if(i===0)ctx.moveTo(X(i),Y(val));else ctx.lineTo(X(i),Y(val));}ctx.stroke();}ctx.font='12px system-ui';ctx.fillStyle='#56e8ce';ctx.fillText(ticker,48,17);ctx.fillStyle='#efad7d';ctx.fillText('QQQ',130,17);ctx.fillStyle='#a5b3ca';ctx.fillText(p[0].date,44,h-7);ctx.fillText(p[p.length-1].date,w-125,h-7);}
+function render(r){$('results').classList.remove('hidden');$('m_ticker').textContent=r.ticker;$('m_days').textContent=r.prices?.audit?.matched_sessions??0;$('m_news').textContent=r.news?.count??0;$('m_signal').textContent=r.returns?.signal_days??0;$('run_status').textContent=r.status;
+$('provider_note').textContent='Price source: '+(r.prices?.audit?.source||'unknown')+' | '+(r.prices?.audit?.price_basis||'');
+const ret=r.returns||{};$('analysis_note').textContent=ret.regression?`Exploratory HC1 OLS: beta ${fmt(ret.regression.beta,4)}, p ${fmt(ret.regression.p_value,4)}, n=${ret.regression.n}. No predictive or causal claim.`:'Regression not estimated: '+(ret.reason||'insufficient evidence');$('file_note').textContent='Full results saved locally: '+r.run_folder;
+chart(r.prices?.recent||[],r.ticker);const t=$('articles');t.replaceChildren();for(const a of r.news?.articles||[]){const tr=document.createElement('tr');tr.appendChild(el('td',a.date));const td=document.createElement('td');const an=el('a',a.title,{href:a.url,target:'_blank',rel:'noopener noreferrer'});td.appendChild(an);tr.appendChild(td);tr.appendChild(el('td',a.source_type.startsWith('first_party')?'Issuer PR':'Publisher'));tr.appendChild(el('td',fmt(a.polarity)));tr.appendChild(el('td',fmt(a.negative_per_1000,2)));tr.appendChild(el('td',fmt(a.uncertainty_per_1000,2)));t.appendChild(tr);}if(!t.children.length){const row=document.createElement('tr'),cell=el('td','No eligible publisher full texts were found. Price data and feed audits may still be available.');cell.colSpan=6;row.appendChild(cell);t.appendChild(row);}}
+async function poll(){try{const s=await readState();$('state').textContent=s.status.toUpperCase();$('status_line').textContent=s.message||'';$('trace').textContent=(s.lines||[]).join('\n')||'Initializing...';$('trace').scrollTop=$('trace').scrollHeight;if(s.status==='running'){$('bar').style.width='65%';}else{active=false;$('go').disabled=false;$('bar').style.width=s.status==='complete'?'100%':'0%';if(s.report)render(s.report);if(s.status==='failed')$('status_line').className='err';} }catch(e){$('state').textContent='NETWORK ERROR';$('status_line').textContent=String(e);active=false;$('go').disabled=false;}if(active)pollHandle=setTimeout(poll,1200);}
+$('go').onclick=async()=>{if(active)return;const options={ticker:$('ticker').value,news_days:Number($('news_days').value),price_years:Number($('price_years').value),max_news:Number($('max_news').value),price_mode:$('price_mode').value,use_proxy:$('use_proxy').checked,local_llm:$('local_llm').checked};$('go').disabled=true;$('results').classList.add('hidden');$('status_line').className='fine';try{const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(options)});const j=await r.json();if(!r.ok)throw Error(j.error||'Failed');active=true;$('bar').style.width='12%';poll();}catch(e){$('go').disabled=false;$('status_line').textContent=String(e);}};
+refreshPrices();readState().then(s=>{if(s.status==='complete'&&s.report)render(s.report);if(s.status==='running'){active=true;$('go').disabled=true;poll();}}).catch(()=>{});
+</script></body></html>

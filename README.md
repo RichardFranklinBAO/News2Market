@@ -1,178 +1,92 @@
-# News2Market
+# News2Market v3.1
 
-**Automated financial-news discovery and economic-text measurement | Zero paid APIs | Exploratory pilot**
+**Nasdaq-only historical-data import · Three-company news research · 100% English local dashboard**
 
-> **Research status (November 5, 2026):** A reproducible engineering prototype with limited empirical validation. It is **not** a profitable trading strategy, a causal study, or a validated financial language model.
+A reproducible research/engineering prototype for exploratory financial-news measurement. Select NVIDIA (NVDA), Apple (AAPL), or Alphabet Class A / Google (GOOGL). The same Python pipeline handles company-aware news discovery, extraction, Loughran–McDonald (LM) financial lexicon measurement, optional local Ollama Qwen2.5 1.5B labels and *exploratory* close-to-close relative-return analysis against QQQ.
 
-## Why this project?
-
-Financial news text is easy to collect and score, but difficult to measure consistently. News2Market asks three practical research questions:
-
-1. How much do issuer boilerplate and source choice affect finance-specific lexicon scores?
-2. Can a small **local** language model extract economically meaningful information while passing structured-output and evidence audits?
-3. Is any tentative news tone associated with later equity returns in a small, explicitly exploratory pilot?
-
-## What it actually does
-
-| Stage | Implementation | Key caveat |
-|---|---|---|
-| Official company disclosures | NVIDIA Newsroom HTML and SEC filing support | First-party press releases are not independent journalism |
-| Automatic third-party discovery | Google/Bing search RSS plus publisher RSS; deduplication and fallback | One pilot found only two full-text articles; feeds may break or be blocked |
-| Text extraction | Restrained HTTP, source metadata, conservative access handling | No paywall, CAPTCHA, or authorization bypass; respect robots and publisher policies |
-| Dictionary tone | Official Loughran–McDonald (LM) word lists | Lexicon tone ≠ economic impact, expectations, or future returns |
-| Local LLM (optional) | Ollama Qwen2.5 1.5B; evidence-ID audit | Model scores/labels remain unvalidated; errors preserved |
-| Exploratory return analysis | User-provided NVDA / QQQ historical prices, daily aggregation, HC1 OLS | 18 signal days, unknown precise release time, no out-of-sample test |
-
-## Technical implementation and engineering workflow
-
-This is a **modular Python research pipeline**, not just a sentiment-scoring demo. The stages below describe implemented functionality and distinguish demonstrated results from unvalidated research extensions.
-
-| Step | Implemented technique | Main implementation |
-|---|---|---|
-| 1. Study setup and entity resolution | YAML-controlled ticker/benchmark, news dates, SEC CIK matching or NVIDIA-specific collection, run-specific UTC IDs | `Inputs/config.yaml`, `run_all.py`, `Scripts/00_resolve_company.py` |
-| 2. Issuer news acquisition | Requests/BeautifulSoup parsing of NVIDIA Newsroom announcements; optional SEC support | `Scripts/02_scrape_articles.py`, `Scripts/03_collect_filings.py` |
-| 3. Automatic third-party discovery | Search and publisher RSS feeds; XML parsing, date/title relevance filtering, URL normalization, multi-source fallback and deduplication; **no manually seeded article URLs** in the automatic run | `Scripts/15_auto_external_news.py` |
-| 4. Responsible body extraction | Permitted publisher HTML retrieval, `trafilatura` extraction, minimum-length/body checks, source-date audit, 429/403 handling without bypassing protections | `Scripts/03b_scrape_external.py`, `Scripts/15_auto_external_news.py` |
-| 5. Text quality and cleaning | Normalized-URL/text deduplication; preserve raw evidence; identify and trim known first-party boilerplate in a separate cleaned field; compare original versus cleaned scores | `Scripts/04_clean_deduplicate.py`, `Scripts/11_prepare_text.py`, `Scripts/11b_lm_cleaned.py` |
-| 6. Financial lexicon measurement | Official Loughran–McDonald positive/negative dictionary lookups; word counts, missing-value handling, and document-level polarity `(positive - negative)/(positive + negative)` | `Scripts/05_lm_sentiment.py`, `Scripts/lm_dictionary.py` |
-| 7. Optional local LLM labeling | Ollama HTTP inference, Qwen2.5 1.5B, constrained JSON output, event categories, economic-channel labels and numbered excerpts; schema/range/quote audits and retry logs | `Scripts/12_local_llm_labels.py` |
-| 8. Market dataset and alignment | Import user-supplied daily Nasdaq CSVs, parse dates and raw `Close/Last`, join NVDA and QQQ trading days, aggregate news scores, conservatively align outcomes after reported news dates | `Scripts/07_get_prices.py`, `Scripts/08_build_signals.py`, `Scripts/signal_core.py` |
-| 9. Exploratory inference | Pearson correlation, OLS with HC1 heteroskedasticity-robust SE, coefficient/p-value/R² and diagnostic scatterplot; no causal or backtest claims | `Scripts/09_validate.py` |
-| 10. Audit and reproducibility | Per-run CSV/JSON provenance, original input hashes, raw-versus-cleaned measurement, model-failure preservation, isolated external runs, offline unit tests and documentation | `Results/<TICKER>/<UTC_run_id>/`, `tests/`, `docs/` |
-
-**Software stack:** Python 3.11–3.12; `requests`, `beautifulsoup4`, `trafilatura` and Python XML parsing for news collection; `pandas`/`numpy` for tables and numeric operations; `statsmodels` for regression; `matplotlib` for plots; `PyYAML` for configuration; Ollama for **optional, local-only** model inference. No paid LLM/API calls were used.
-
-## Local LLM choice, constrained hardware, and future scaling
-
-**What was actually tested.** Development took place on a personal Mac with limited available memory (approximately **5 GB available** during the pilot). To stay within this practical resource budget and avoid paid inference, the experiment used [Ollama](https://ollama.com/) to run **`qwen2.5:1.5b` locally**, after initially experimenting with **`qwen2.5:0.5b`**. The 1.5B model was a **hardware-constrained proof of concept**, **not a claim that 1.5B is state of the art or the optimal finance model**. The model itself is not trained or fine-tuned by this project.
-
-**Implementation detail.** `Scripts/12_local_llm_labels.py` calls the local Ollama chat endpoint `http://127.0.0.1:11434/api/chat` via HTTP and asks for a constrained JSON object. In the reported configuration it used `temperature=0`, `num_ctx=2048`, `num_predict=240`, and an approximately **1,000-character** article input budget. Python constructs up to **five numbered original-text excerpts**; the model chooses an `evidence_id`, and Python retrieves that exact excerpt instead of trusting a model-generated quotation. It records the model ID, prompt version, input hash, retries, response errors and flags for invalid evidence or scores. This limits some formatting errors, **but does not establish that a selected quote supports the economic interpretation**.
-
-**Measured limitations.** In the 30-article NVIDIA issuer-news pilot using the 1.5B model, **9/30** final labels passed structural/evidence checks, **3/30** required review, and **18/30** failed, often because the model generated a score outside the allowed `[-1,+1]` range (such as `4`). Economic-channel labels also repeatedly collapsed to `Investor_Relations`, and some chosen evidence excerpts were truncated. Invalid scores were **kept missing**, not clipped to valid numbers. These model labels **were not used as validated predictors in the reported market regression**; that regression used LM dictionary measurements. Small-model output should not be equated with research-grade economic truth.
-
-**Future work (not implemented or benchmarked here):** compare larger local models (e.g., 3B/7B and larger, where adequate RAM/VRAM/compute is available), use stronger event/category taxonomies, obtain independent blinded human labels, evaluate per-class agreement and calibration, and investigate better publication-time alignment and out-of-sample evaluation. Any future cloud or paid model experiments would be explicitly labeled separately from this **zero-paid-API** baseline. Larger models may help, but their superiority has **not** been established by this pilot.
-
-**Reproduce the exact reported model choice:**
+## Quick start
 
 ```bash
-# Install Ollama from https://ollama.com/ first.
-ollama pull qwen2.5:1.5b
-# Optional; the default third-party pipeline runs LM scoring without Ollama:
-python Scripts/16_auto_news_research.py \
-  --ticker NVDA --query NVIDIA --days 30 --max-external 5 \
-  --local-llm --llm-model qwen2.5:1.5b
+# In a fresh GitHub clone of this repository:
+python -m pip install -r requirements_v3.txt
+python run_v3.py --web
 ```
 
-For the historical issuer-news runner, **explicitly specify** `--llm-model qwen2.5:1.5b`; the older runner retains a different legacy default. Available memory and model performance depend on local hardware, and a fresh online crawl will not necessarily yield the same news articles.
+**Before pressing Run:** the dashboard displays the required **official Loughran–McDonald dictionary** and Nasdaq stock/QQQ CSV status. The dictionary is **not included in GitHub**. The program first checks `Inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv` and, if missing, tries to validate and reuse a local copy from a sibling `News2Market/Inputs/` directory. If neither exists, download the official version from [Notre Dame SRAF](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) and place it under `Inputs/`. The run stops **before any market/news requests** if the file is absent or invalid; it never uses a synthetic substitute.
 
-## Data sources and exact pilot date ranges
+The Nasdaq CSV files likewise remain local-only, can be imported through the English dashboard, and must include the selected stock **plus QQQ**. A new clone without these authorized research inputs will show installation prompts, not produce empirical results.
 
-The pilot uses **publicly accessible third-party data acquired from the original providers**. These are not included in the GitHub repository; users must download them under the providers' terms.
+Open `http://127.0.0.1:8765`. The UI, status indicators, data import, charts, and explanations are entirely in English. More detailed setup is in [`V3_START_HERE.md`](V3_START_HERE.md).
 
-### Historical market prices (Nasdaq)
+## Market data — Nasdaq only (no Yahoo)
 
-| Local file | Instrument | Original download page | Historical sample window (inclusive) | Frequency / price field |
-|---|---|---|---|---|
-| `Inputs/prices/NVDA.csv` | NVIDIA Corporation common stock (`NVDA`) | [Nasdaq NVDA Historical Data](https://www.nasdaq.com/market-activity/stocks/nvda/historical) | **2021-11-05 → 2026-11-04** | Daily, `Close/Last`, USD |
-| `Inputs/prices/QQQ.csv` | Invesco QQQ Trust, Series 1 ETF (`QQQ`), used as the benchmark | [Nasdaq QQQ Historical Data](https://www.nasdaq.com/market-activity/etf/qqq/historical) | **2021-11-05 → 2026-11-04** | Daily, `Close/Last`, USD |
+This release **does not use Yahoo Finance or yfinance**. It supports **locally preserved official Nasdaq historical CSV exports only**, with `Date` and `Close/Last` columns. When available, it automatically reuses source-hash-verified NVDA and QQQ CSVs from your existing sibling `News2Market` project. The web UI can import a user-confirmed Nasdaq CSV for any of the three companies and QQQ, then automatically reuse it for subsequent runs.
 
-**Observed pilot coverage:** After joining `NVDA` and `QQQ` by date, the original empirical dataset contained **1,254 matched trading sessions**, from **November 5, 2021** through **November 4, 2026**. This describes the original historical download and its matched sample, not a guarantee that a fresh download will have identical rows. Preserve provider/version, raw files and `07_price_audit.json` (including hashes) for exact reproduction.
+| Symbol | Issuer / fund | Official Nasdaq historical data |
+|---|---|---|
+| NVDA | NVIDIA Corporation | https://www.nasdaq.com/market-activity/stocks/nvda/historical |
+| AAPL | Apple Inc. | https://www.nasdaq.com/market-activity/stocks/aapl/historical |
+| GOOGL | Alphabet Inc., Class A | https://www.nasdaq.com/market-activity/stocks/googl/historical |
+| QQQ | Invesco QQQ Trust ETF, benchmark | https://www.nasdaq.com/market-activity/etf/qqq/historical |
 
-**Price definition:** Nasdaq-exported `Close/Last` is **not cash-dividend-adjusted total return**. The pilot estimates close-to-close **price-return** differences (`NVDA` minus `QQQ`), not dividend-reinvested or risk-adjusted abnormal returns. Corporate-action/split handling should be checked against the provider's methodology. Do not substitute adjusted closes without explicitly documenting a changed specification.
+Original NVDA/QQQ pilot range: **2021-11-05 through 2026-11-04** (1,254 paired trading sessions, user-provided raw `Close/Last`). The three-company live program independently selects the latest 1, 3 or 5 years, subject to actual imported CSV coverage. Raw Nasdaq `Close/Last` is **not adjusted for cash dividends**; vendor/corporate-action handling must be verified. Results are not total returns or factor-adjusted abnormal returns.
 
-**How to obtain:** Open each Nasdaq page, download its daily historical CSV covering the stated dates (when available), rename the exported files to `NVDA.csv` and `QQQ.csv`, and place them in `Inputs/prices/`. The parser accepts a `Date` column plus `Close/Last` (or a supported alternative). Nasdaq page availability, date-range controls, and downloadable coverage may change; see [Nasdaq Historical Data](https://www.nasdaq.com/market-activity/quotes/historical).
+**Why not automatically download from Nasdaq.com?** Nasdaq's site terms restrict unauthorized automated extraction for analysis. The free MVP therefore requires an authorized/user-permitted original download and a one-time local import. It does not evade rate limits or simulate a Nasdaq API connection. A licensed/explicitly permitted official API could later enable genuinely automated downloads; no claim is made that it exists in this release.
 
-### Finance-specific dictionary (University of Notre Dame)
+## Dataflow / technology stack
 
-| Local file | Source / authors | Exact version | Official page |
-|---|---|---|---|
-| `Inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv` | Loughran–McDonald financial sentiment Master Dictionary, University of Notre Dame SRAF | **1993–2025** CSV (official page updated **March 2026**) | [Notre Dame — Loughran–McDonald Master Dictionary](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) |
+1. **Company identity:** fixed and audited profiles for NVDA, AAPL and GOOGL (including ticker, official source, CIK and search aliases).
+2. **Historical prices:** verified local Nasdaq CSVs for the selected stock and QQQ; no cross-vendor mixing; dated joins and per-run provider audits.
+3. **News retrieval:** NVIDIA Newsroom or issuer RSS plus third-party RSS; canonical URL deduplication; respectful, restricted-access HTML requests.
+4. **Text extraction and quality control:** bounded extraction; original evidence retained; page/RSS date audit; source-specific boilerplate controls.
+5. **LM dictionary sentiment:** Notre Dame's Loughran–McDonald Master Dictionary (user-downloaded separately): token counts and per-1,000-word positive, negative, uncertainty rates. Project-defined polarity `(positive-negative)/(positive+negative)` is a *secondary, unvalidated index*; categorical thresholds are project heuristics, not established financial facts.
+6. **Optional local model:** Ollama + Qwen2.5 1.5B, constrained structured output and evidence IDs. In the historical 30-NVIDIA-article pilot 9/30 passed structural/evidence checks, 3/30 needed review and 18/30 failed. These are not independent human accuracy statistics.
+7. **Exploratory inference:** conservative date-only alignment, NVDA/AAPL/GOOGL price-return minus QQQ, Pearson correlation and HC1 OLS if enough dated news signals. No predictive, causal or trading-profit claim.
+8. **Auditability:** isolated run directories under `Results/<ticker>/V3/<run_id>/`, input hashes, machine-readable audit JSON and per-article LM CSVs.
 
-The `1993–2025` in the filename identifies the **dictionary version/coverage**, **not** the study's stock-price dates. Download the CSV with exactly this filename from the official page and save it under `Inputs/`. The provider says its word lists are free for academic research; permission to use is distinct from permission to republish the full dictionary.
+**Core software:** Python 3.11–3.12, requests, BeautifulSoup, trafilatura, pandas, NumPy, statsmodels, matplotlib and a local stdlib HTTP dashboard. No paid APIs, no Yahoo package or hosted interface.
 
-### News sources and the separate news window
+## Source rights and research limitations
 
-* First-party issuer announcements: [NVIDIA Newsroom](https://nvidianews.nvidia.com/); `Inputs/config.yaml` sets the original **news-study window** to **2026-08-01 through 2026-11-04**, which is **different from the five-year market-price window**. The observed pilot captured 30 announcements, not every release in that window.
-* Automatically discovered external articles: public search/publisher RSS feeds (including TechCrunch and CNBC in the pilot), followed by permitted publisher-text extraction. The November 5, 2026 external trial retrieved 2 full texts. New RSS runs select a rolling window and will not necessarily reproduce those same articles.
+* The complete LM dictionary, news bodies and original market CSVs must be acquired by each research user under applicable terms; they are not bundled.
+* A Nasdaq CSV download has **no ticker field**, so original ticker identity cannot be verified from its contents alone. The user must attest to the ticker and official origin when importing.
+* RSS failures, legal access restrictions and missing/news-only metadata can mean zero extracted news. Never use synthetic fixtures as empirical data.
+* Without verified intraday publication timestamps, same-day price reaction and causal event-study statements are unsupported.
+* LM tone is distinct from market surprise: e.g. financial risk disclaimers and sparse sentiment hits can distort document-level polarity.
+* Three-company live end-to-end internet acquisition has not been independently confirmed in the user environment. Offline tests are engineering checks, not financial validation.
 
-## Quick start (macOS/Linux)
+## Limitations and resource-constrained development
 
-Python 3.11–3.12 recommended (newer versions may work but have not been independently validated). Commands assume you are in the repository root.
+This project was created **independently on a personal computer**, using freely accessible research tools rather than institutional computing clusters, licensed market-data feeds, a production news archive, or a team of human annotators. The three-company scope is an intentional, testable **proof of concept** for a research portfolio—not a claim of production readiness. These limitations explain the current **implementation scope**, but they do not make its reported statistical results or unvalidated labels more reliable.
+
+| Current limitation | Why it matters | Potential direction with additional resources (not yet implemented) |
+|---|---|---|
+| **Local hardware and model scale** | Running Ollama `qwen2.5:1.5b` on a memory-constrained personal Mac limits context length, throughput and model choice. The historical 30-article audit produced 9 structurally valid/evidence-linked outputs, 3 review cases and 18 failures. | Benchmark stronger models with sufficient RAM/VRAM or authorized compute; use independent human judgments to test validity, not assume bigger models are automatically better. |
+| **Dictionary installation / redistribution** | The official LM 1993–2025 Master Dictionary is **not committed to GitHub** and must be downloaded separately under Notre Dame's terms. A new clone without it cannot perform actual LM scoring. | Make local setup and integrity checks easier; use a source-authorized distribution or download mechanism only if the provider permits one. The app now checks the file **before** starting news collection. |
+| **Market-price access** | This free version does not have licensed automated Nasdaq API access; it **does not** use Yahoo or bypass Nasdaq restrictions. NVDA/AAPL/GOOGL and QQQ require one-time user-supplied Nasdaq `Close/Last` files. | Add an explicitly licensed/authorized provider adapter, scheduled updates, adjusted-close/total-return treatment, and multi-vendor quality cross-checks. |
+| **News coverage and entity matching** | Public RSS feeds can time out, change format or restrict access. Candidate relevance is largely lexical, source coverage differs by issuer, and the available sample is small. The original 30-article NVIDIA pilot does not imply five years of news. | Expand to verified and licensed archives, more issuers, broader historical coverage, and robust company/alias/entity resolution with manual audits. |
+| **Information timing and empirical validity** | Most dates are day-level rather than verified first market-visible times. Relative `Close/Last` **price returns** against QQQ are not dividends-adjusted total returns or factor-adjusted abnormal returns. No causal or predictive interpretation is justified. | Acquire reliable publication timestamps, calibrate market calendars, implement factor adjustment, matched controls, out-of-sample evaluation and more defensible event-study designs. |
+| **Lexicon measurement** | LM was developed for financial disclosures; earnings-call notices, legal disclaimers and sparse matched words can generate misleading extremes. The project's polarity formula and category thresholds are **design choices, not a validated economic surprise measure**. | Compare positive/negative/uncertainty frequencies per 1,000 words, alternative lexica, cleaned text and independently labeled data, then test sensitivity. |
+| **Research software maturity** | The dashboard is **local-only**, processes one selected company per run and has not been security-hardened or load-tested for arbitrary public Internet deployment. | Add robust job queues, caching, monitoring, permissions, reproducible data manifests and CI; expand the company registry after testing, rather than claiming current all-US-market support. |
+
+**Development outlook:** With additional computing capacity, properly licensed data access, more complete historical coverage and stronger independent validation, this architecture can be extended to a more comprehensive and rigorous financial-text research platform. These are **feasible development directions**, not achieved results or guaranteed predictive gains. Honest reporting of limitations, including negative or non-significant findings, is part of the research contribution.
+
+## Research provenance and interpretation
+
+* **Historical NVIDIA pilot (v2):** Original NVDA and QQQ Nasdaq CSVs covered **2021-11-05 through 2026-11-04**, yielding **1,254 paired trading sessions**. The 30 NVIDIA Newsroom observations produced **18 signal days** and **no significant linear return association** (HC1 p ≈ 0.8602); these results are historical v2 evidence, not a claim about AAPL or GOOGL.
+* **Three-company interface (v3.1):** Uses a **rolling** price window of 1/3/5 years and news window of 14/30/60/90 days. Exact effective coverage depends on provided Nasdaq CSVs and legitimately accessible news at run time. Each run records its own file hashes and actual data availability.
+* **Official sources:** [Nasdaq NVDA](https://www.nasdaq.com/market-activity/stocks/nvda/historical), [Nasdaq AAPL](https://www.nasdaq.com/market-activity/stocks/aapl/historical), [Nasdaq GOOGL](https://www.nasdaq.com/market-activity/stocks/googl/historical), [Nasdaq QQQ](https://www.nasdaq.com/market-activity/etf/qqq/historical), [Notre Dame LM Dictionary](https://sraf.nd.edu/loughranmcdonald-master-dictionary/), [NVIDIA Newsroom](https://nvidianews.nvidia.com/). See [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md) and [`docs/RESEARCH_REPORT.md`](docs/RESEARCH_REPORT.md).
+* The live v3 workflow has been tested offline using synthetic test fixtures and the original real Nasdaq files for data parsing. **A live online end-to-end test of all three firms, including full news coverage and market inference, remains incomplete.** Synthetic fixtures are never described as real market evidence.
+
+## Testing and command line
 
 ```bash
-python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
+python run_v3.py --ticker AAPL --news-days 30 --price-years 5
 ```
 
-**Install required research inputs locally (not redistributed):**
+The second command requires the official LM dictionary and verified local Nasdaq CSVs for **AAPL and QQQ**. It may return zero articles or an explicit access error when upstream providers are unavailable. Unit tests with synthetic fixtures validate engineering behavior but are not evidence about real equity returns.
 
-* Official `Loughran-McDonald_MasterDictionary_1993-2025.csv` in `Inputs/` — download from the [Notre Dame SRAF site](https://sraf.nd.edu/loughranmcdonald-master-dictionary/).
-* For historical price tests/analysis, Nasdaq daily CSVs at `Inputs/prices/NVDA.csv` and `Inputs/prices/QQQ.csv` covering **2021-11-05 to 2026-11-04** (original 1,254 matching trading sessions). Format: `Date,Close/Last`, `Date,Close`, or `Date,Adj Close`; dates may be MM/DD/YYYY or ISO. **Use the original raw `Close/Last` data to match the pilot specification**; price adjustments must be verified with the provider.
+The CLI and web app share `v3_core.run_pipeline`. Select `--price-mode auto` (default, verified local Nasdaq auto-reuse) or `--price-mode nasdaq_csv` (only files in this project's Inputs). Neither mode makes unauthorized Nasdaq requests. See [`V3_START_HERE.md`](V3_START_HERE.md) and [`PRICE_SOURCE_NOTE.md`](PRICE_SOURCE_NOTE.md).
 
-### One-command external news → LM measurement (no preselected article URLs)
-
-```bash
-python Scripts/16_auto_news_research.py \
-  --ticker NVDA --query NVIDIA --days 30 --max-external 5
-```
-
-Writes a new `Results/NVDA/ExternalAuto/<UTC_run_id>/` directory. The code tries multiple public RSS feeds and records failures separately from empty feeds. **It does not modify** the historical `LATEST.txt` or automatically add current articles to a past return regression.
-
-To rerun only the LM measurement from a previously collected auto-RSS run, without new network requests:
-
-```bash
-python Scripts/16_auto_news_research.py --ticker NVDA --existing-run YOUR_UTC_RUN_ID
-```
-
-For optional **local-only** LLM output, install [Ollama](https://ollama.com/) and pull `qwen2.5:1.5b`, then add `--local-llm --llm-model qwen2.5:1.5b`. Its output is an audit artifact, **not** independently validated truth.
-
-### Original issuer-news / market pilot
-
-```bash
-python run_all.py --mode demo
-python run_all.py --mode live --ticker NVDA --max-articles 10 --collect-only
-# After installing valid market CSVs and reviewing the run context:
-python run_all.py --mode live --ticker NVDA --resume
-```
-
-`Inputs/config.yaml` controls the historical study window and other data collection settings. Use original URLs and provenance, not synthetic results, for live research. The demo is intentionally synthetic and must never be represented as empirical evidence.
-
-## Observed pilot results (not promises of performance)
-
-The November 5, 2026 pilot yielded:
-
-* **First-party historical text:** 30 NVIDIA newsroom articles, with LM polarity hits in 29; 18 daily signal observations.
-* **Exploratory NVDA-minus-QQQ close-to-close price-return regression:** Pearson correlation −0.0353; OLS sentiment coefficient −0.00174; HC1 SE 0.00986; exploratory *p* ≈ 0.860; R² ≈ 0.00125. No demonstrated association. **This is not an abnormal-return, causal, or trading-profit result.**
-* **Local Qwen2.5 1.5B, 30 articles:** 9 passed structural/evidence checks, 3 required review, and 18 failed (primarily invalid numeric scores). A pass is **not a semantic-accuracy score**.
-* **Automatically discovered third-party text:** 6/8 RSS feeds operational, 2 distinct relevant articles discovered, 2 publisher bodies retrieved, 2 with LM polarity matches. Observed LM scores: +0.142857 (TechCrunch Box/Nemotron), +0.500000 (CNBC Moonshot/Blackwell). These are not market-return predictions.
-* **Reference coding:** 10 texts received *AI-assisted* reference labels, which do **not** constitute independently blinded human ground truth.
-
-See [`docs/RESEARCH_REPORT.md`](docs/RESEARCH_REPORT.md), [`docs/pilot_metrics_2026-11-05.json`](docs/pilot_metrics_2026-11-05.json), and the two-news summary [`docs/external_lm_results_2026-11-05.csv`](docs/external_lm_results_2026-11-05.csv).
-
-### Historical issuer-news scatterplot
-
-![NVDA-minus-QQQ exploratory price returns against daily LM score](docs/figures/09_signal_vs_return.png)
-
-## Reproducibility and ethics
-
-* Complete code is included, but **raw third-party text, vendor-supplied market data, and the official LM dictionary are not redistributed**. Supply these files under their own terms.
-* Feed/HTML changes and site/network restrictions can prevent future runs from finding exactly the same articles. Original pilot results are summarized in `docs/`; this is **reproducibility documentation, not a guarantee of identical online data**.
-* Model output validity and textual evidence are audited separately from economic interpretation.
-* Publication times are not verified intraday, therefore externally discovered news must **not** be blindly joined to same-day returns.
-* Automated fetching must respect website terms, `robots.txt`, access controls and rate limits. No ban or paywall circumvention is implemented.
-
-## Repository layout
-
-```text
-Scripts/                Python discovery, extraction, LM, LLM, and regression modules
-Inputs/config.yaml      Data collection settings
-Inputs/prices/          Local-only raw price files (excluded from Git)
-Results/                Per-run outputs and audits (excluded from Git)
-tests/                  Offline unit tests
-docs/                   Release-level aggregate research evidence, without raw text
-run_all.py              Historical issuer-news pipeline
-```
-
-For commands, caveats, data provenance and run checks, see [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md). For macOS/GitHub publishing steps, see [`docs/发布到GitHub_中文指南.md`](docs/发布到GitHub_中文指南.md). See `Python.md` for additional legacy instructions.
-
-**License:** No license is granted by this draft repository; the author should choose a code license before public reuse. Data source copyright and usage permissions are separate from code licensing.
+**Research status:** exploratory prototype; no validated stock return forecasting or reliable LLM label accuracy. The initial NVDA pilot (v2) obtained 18 signal days and no statistically significant association (HC1 p ≈ 0.8602). The new three-stock live output remains to be individually verified.

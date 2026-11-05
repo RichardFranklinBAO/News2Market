@@ -1,3 +1,17 @@
+# Reproducibility: News2Market v3.1 and historical v2 pilot
+
+**Current public-code entrypoint:** `python run_v3.py --web`. Install dependencies with `python -m pip install -r requirements_v3.txt`. The dashboard runs locally on `http://127.0.0.1:8765` and supports NVDA, AAPL and GOOGL (Alphabet Class A), benchmarked to QQQ.
+
+**Required inputs:** The official LM 1993–2025 dictionary must be placed in `Inputs/` or validated and reused from a local sibling `News2Market` project. The repo does **not** redistribute the dictionary; use https://sraf.nd.edu/loughranmcdonald-master-dictionary/. A missing/invalid dictionary is detected before the news crawl. Selected company and QQQ must also have separately obtained official Nasdaq `Date,Close/Last` CSVs, imported via the dashboard. This version makes **no Yahoo calls** and does **not** automatically scrape Nasdaq.
+
+**Main run checks:** `python -m unittest discover -s tests -v`; `python run_v3.py --ticker NVDA --news-days 30 --price-years 5` for a real run with authorized local data and permitted network access. Three-company offline fixtures and unit tests do not constitute online validation. The original 30 NVIDIA news articles are not republished.
+
+**Limits:** News may be missing; official releases and editorial coverage are not interchangeable; article timestamps are often day-level; raw `Close/Last` is not dividend-adjusted total return; LM and local Qwen2.5 1.5B measurements are not validated market-surprise indicators; HC1 OLS is exploratory. See the `Limitations and resource-constrained development` section of the root README.
+
+---
+
+## Legacy research and reproduction notes
+
 # Reproducibility and source integrity
 
 ## 1. Test the code without any internet or proprietary inputs
@@ -8,19 +22,9 @@ python -m unittest discover -s tests -v
 python -m compileall -q Scripts run_all.py
 ```
 
-Offline tests cover parsing, source selection, LM scoring, synthetic price joining, local model schema/evidence validation, and external RSS/bridge filtering. The historical five-year integration test is **skipped if non-redistributed third-party CSVs are absent**.
+Offline tests cover parsing, source selection, LM scoring, synthetic price joining, local model schema/evidence validation, and external RSS/bridge filtering. The historical five-year integration test is **skipped if non-redistributed private CSVs are absent**.
 
 ## 2. Obtain legitimate research data
-
-**Exact pilot data provenance:**
-
-| Input | Official source | Historical period or version | Local path |
-|---|---|---|---|
-| NVDA daily price | [Nasdaq NVDA historical page](https://www.nasdaq.com/market-activity/stocks/nvda/historical) | **2021-11-05 to 2026-11-04**, daily USD `Close/Last` | `Inputs/prices/NVDA.csv` |
-| QQQ daily benchmark price | [Nasdaq QQQ historical page](https://www.nasdaq.com/market-activity/etf/qqq/historical) | **2021-11-05 to 2026-11-04**, daily USD `Close/Last` | `Inputs/prices/QQQ.csv` |
-| Loughran–McDonald Master Dictionary | [University of Notre Dame SRAF](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) | `Loughran-McDonald_MasterDictionary_1993-2025.csv` (official page updated March 2026) | `Inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv` |
-
-The historical dataset had **1,254 NVDA/QQQ date-matched trading sessions**. The **news collection configuration** is a different period, **2026-08-01 to 2026-11-04**. For an exact historical regression reproduction, preserve the original price CSVs and captured news snapshot; newly fetched articles and downloaded price revisions can differ. The original price field `Close/Last` is **not adjusted for cash dividends**; do not label these as total returns. Publication-time uncertainty limits return interpretation.
 
 * Obtain the official Loughran–McDonald 1993–2025 master dictionary and place it under `Inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv`; check your usage eligibility before downloading.
 * Optional historical empirical mode requires authentic closing-price CSVs in `Inputs/prices/NVDA.csv` and `Inputs/prices/QQQ.csv`; review split/dividend methodology and preserve data-source provenance.
@@ -33,8 +37,6 @@ python Scripts/16_auto_news_research.py --ticker NVDA --query NVIDIA --days 30 -
 ```
 
 Check `Results/NVDA/ExternalAuto/<RUN_ID>/16_research_audit.json` for `lm_status`, exclusions, eligible counts and the intraday-time warning. The `16_external_lm_summary.csv` links to the article sources; no original publisher body is redistributed in this repo.
-
-**Local hardware / model specification:** The reported experimental model was `qwen2.5:1.5b` running through local Ollama on a memory-limited personal Mac (~5 GB available during development). This was a resource-constrained pilot, not a trained/fine-tuned or validated finance LLM. `Scripts/12_local_llm_labels.py` calls `http://127.0.0.1:11434/api/chat` with `temperature=0`, `num_ctx=2048`, `num_predict=240`, JSON output constraints, source evidence IDs and failure audits. Keep the model choice explicit in commands. The legacy `run_all.py` default is different; pass `--llm-model qwen2.5:1.5b` there. Model weights and Ollama runtime must be obtained separately; this repository includes neither.
 
 Optional LLM (Ollama installed locally with `ollama pull qwen2.5:1.5b`):
 

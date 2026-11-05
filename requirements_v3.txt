@@ -1,0 +1,2 @@
+# v3.1 uses Nasdaq-only local data; Yahoo/yfinance removed.
+-r requirements.txt
