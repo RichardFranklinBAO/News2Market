@@ -23,6 +23,36 @@ Financial news text is easy to collect and score, but difficult to measure consi
 | Local LLM (optional) | Ollama Qwen2.5 1.5B; evidence-ID audit | Model scores/labels remain unvalidated; errors preserved |
 | Exploratory return analysis | User-provided NVDA / QQQ historical prices, daily aggregation, HC1 OLS | 18 signal days, unknown precise release time, no out-of-sample test |
 
+## Data sources and exact pilot date ranges
+
+The pilot uses **publicly accessible third-party data acquired from the original providers**. These are not included in the GitHub repository; users must download them under the providers' terms.
+
+### Historical market prices (Nasdaq)
+
+| Local file | Instrument | Original download page | Historical sample window (inclusive) | Frequency / price field |
+|---|---|---|---|---|
+| `Inputs/prices/NVDA.csv` | NVIDIA Corporation common stock (`NVDA`) | [Nasdaq NVDA Historical Data](https://www.nasdaq.com/market-activity/stocks/nvda/historical) | **2021-11-05 → 2026-11-04** | Daily, `Close/Last`, USD |
+| `Inputs/prices/QQQ.csv` | Invesco QQQ Trust, Series 1 ETF (`QQQ`), used as the benchmark | [Nasdaq QQQ Historical Data](https://www.nasdaq.com/market-activity/etf/qqq/historical) | **2021-11-05 → 2026-11-04** | Daily, `Close/Last`, USD |
+
+**Observed pilot coverage:** After joining `NVDA` and `QQQ` by date, the original empirical dataset contained **1,254 matched trading sessions**, from **November 5, 2021** through **November 4, 2026**. This describes the original historical download and its matched sample, not a guarantee that a fresh download will have identical rows. Preserve provider/version, raw files and `07_price_audit.json` (including hashes) for exact reproduction.
+
+**Price definition:** Nasdaq-exported `Close/Last` is **not cash-dividend-adjusted total return**. The pilot estimates close-to-close **price-return** differences (`NVDA` minus `QQQ`), not dividend-reinvested or risk-adjusted abnormal returns. Corporate-action/split handling should be checked against the provider's methodology. Do not substitute adjusted closes without explicitly documenting a changed specification.
+
+**How to obtain:** Open each Nasdaq page, download its daily historical CSV covering the stated dates (when available), rename the exported files to `NVDA.csv` and `QQQ.csv`, and place them in `Inputs/prices/`. The parser accepts a `Date` column plus `Close/Last` (or a supported alternative). Nasdaq page availability, date-range controls, and downloadable coverage may change; see [Nasdaq Historical Data](https://www.nasdaq.com/market-activity/quotes/historical).
+
+### Finance-specific dictionary (University of Notre Dame)
+
+| Local file | Source / authors | Exact version | Official page |
+|---|---|---|---|
+| `Inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv` | Loughran–McDonald financial sentiment Master Dictionary, University of Notre Dame SRAF | **1993–2025** CSV (official page updated **March 2026**) | [Notre Dame — Loughran–McDonald Master Dictionary](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) |
+
+The `1993–2025` in the filename identifies the **dictionary version/coverage**, **not** the study's stock-price dates. Download the CSV with exactly this filename from the official page and save it under `Inputs/`. The provider says its word lists are free for academic research; permission to use is distinct from permission to republish the full dictionary.
+
+### News sources and the separate news window
+
+* First-party issuer announcements: [NVIDIA Newsroom](https://nvidianews.nvidia.com/); `Inputs/config.yaml` sets the original **news-study window** to **2026-08-01 through 2026-11-04**, which is **different from the five-year market-price window**. The observed pilot captured 30 announcements, not every release in that window.
+* Automatically discovered external articles: public search/publisher RSS feeds (including TechCrunch and CNBC in the pilot), followed by permitted publisher-text extraction. The November 5, 2026 external trial retrieved 2 full texts. New RSS runs select a rolling window and will not necessarily reproduce those same articles.
+
 ## Quick start (macOS/Linux)
 
 Python 3.11–3.12 recommended (newer versions may work but have not been independently validated). Commands assume you are in the repository root.
@@ -34,8 +64,8 @@ python -m unittest discover -s tests -v
 
 **Install required research inputs locally (not redistributed):**
 
-* Official `Loughran-McDonald_MasterDictionary_1993-2025.csv` in `Inputs/` — see <https://sraf.nd.edu/loughranmcdonald-master-dictionary/> for terms and official download.
-* For historical price tests/analysis, legitimate CSV files at `Inputs/prices/NVDA.csv` and `Inputs/prices/QQQ.csv`. Format: `Date,Close/Last`, `Date,Close`, or `Date,Adj Close`; dates may be MM/DD/YYYY or ISO. Price adjustments must be verified with the provider.
+* Official `Loughran-McDonald_MasterDictionary_1993-2025.csv` in `Inputs/` — download from the [Notre Dame SRAF site](https://sraf.nd.edu/loughranmcdonald-master-dictionary/).
+* For historical price tests/analysis, Nasdaq daily CSVs at `Inputs/prices/NVDA.csv` and `Inputs/prices/QQQ.csv` covering **2021-11-05 to 2026-11-04** (original 1,254 matching trading sessions). Format: `Date,Close/Last`, `Date,Close`, or `Date,Adj Close`; dates may be MM/DD/YYYY or ISO. **Use the original raw `Close/Last` data to match the pilot specification**; price adjustments must be verified with the provider.
 
 ### One-command external news → LM measurement (no preselected article URLs)
 
