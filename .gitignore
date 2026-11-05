@@ -1,0 +1,22 @@
+# Third-party academic dictionary, local raw price data and results
+Inputs/Loughran-McDonald_MasterDictionary_*.csv
+Inputs/prices/*.csv
+!Inputs/prices/EXAMPLE_FORMAT.csv
+Inputs/cache/*
+!Inputs/cache/.gitkeep
+Inputs/demo_articles.csv
+Inputs/demo_prices.csv
+Results/*
+!Results/.gitkeep
+.env
+__pycache__/
+*.pyc
+.DS_Store
+.ipynb_checkpoints
+
+# Publication safeguards
+*.log
+*.bak
+*.zip
+*.xlsx
+.DS_Store

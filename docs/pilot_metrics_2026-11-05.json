@@ -1,0 +1,42 @@
+{
+  "study_name": "News2Market experimental pilot, November 5 2026",
+  "historical_first_party": {
+    "articles": 30,
+    "articles_with_lm_polarity": 29,
+    "signal_days": 18,
+    "correlation": -0.03530473704660588,
+    "beta": -0.0017361140156272798,
+    "hc1_se": 0.009858678977419702,
+    "p_value_exploratory": 0.8602153293116095,
+    "r_squared": 0.0012464244579302175,
+    "price_type": "Close/Last; no dividends adjustment; not total return",
+    "market_window": [
+      "2021-11-05",
+      "2026-11-04"
+    ]
+  },
+  "local_llm": {
+    "model": "qwen2.5:1.5b",
+    "articles": 30,
+    "status_counts": {
+      "needs_manual_review": 3,
+      "ok": 9,
+      "error": 18
+    },
+    "independently_human_validated": false,
+    "note": "A JSON/quote pass does not establish semantic accuracy; invalid scores omitted, not clipped."
+  },
+  "external_RSS": {
+    "feeds_attempted": 8,
+    "working_feeds": 6,
+    "distinct_relevant_articles": 2,
+    "full_text_articles": 2,
+    "lm_pol_hits_articles": 2,
+    "data_window": [
+      "2026-10-06",
+      "2026-11-05"
+    ],
+    "publication_timestamp_verified_intraday": false,
+    "merged_with_historical_returns": false
+  }
+}

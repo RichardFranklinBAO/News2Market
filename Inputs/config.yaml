@@ -1,0 +1,20 @@
+project:
+  ticker: NVDA
+  benchmark: QQQ
+  start_date: '2026-08-01'
+  end_date: '2026-11-04'
+collection:
+  archive_url: 'https://nvidianews.nvidia.com/news?c=21926&page={page}'
+  max_articles: 50
+  max_pages: 8
+  min_seconds_between_requests: 2.0
+  timeout_seconds: 20
+  max_page_bytes: 2000000
+  min_article_chars: 80
+  user_agent: 'News2Market/2.0 (independent academic research; configure a real SEC contact separately)'
+labeling:
+  method: lm
+  lm_text_chars: 30000
+analysis:
+  min_regression_days: 8
+  random_seed: 2026

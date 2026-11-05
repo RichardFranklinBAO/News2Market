@@ -1,0 +1,42 @@
+{
+  "NVDA": {
+    "source": "User-provided Nasdaq historical-data CSV (attribution based on upload context and observed price scale; source files do not contain a ticker field)",
+    "uploaded_filename": "HistoricalData_1793873066194.csv",
+    "saved_as": "NVDA.csv",
+    "sha256": "b7fc44756fc16345091a150a518b9b0ffd9d0ce773ebfd28a5a8678bb534795f",
+    "rows": 1254,
+    "first_date": "2021-11-05",
+    "last_date": "2026-11-04",
+    "column_headers": [
+      "Date",
+      "Close/Last",
+      "Volume",
+      "Open",
+      "High",
+      "Low"
+    ],
+    "close_field": "Close/Last",
+    "price_semantics": "Close/Last (split-comparable observed for NVDA June 2024; cash dividends NOT adjusted)",
+    "dividend_adjusted": false
+  },
+  "QQQ": {
+    "source": "User-provided Nasdaq historical-data CSV (attribution based on upload context and observed price scale; source files do not contain a ticker field)",
+    "uploaded_filename": "HistoricalData_1793873082665.csv",
+    "saved_as": "QQQ.csv",
+    "sha256": "ece5f0a6094d2fdaedd4c8120e93222feb1c5dce96b1f9f2f894eefff4434622",
+    "rows": 1254,
+    "first_date": "2021-11-05",
+    "last_date": "2026-11-04",
+    "column_headers": [
+      "Date",
+      "Close/Last",
+      "Volume",
+      "Open",
+      "High",
+      "Low"
+    ],
+    "close_field": "Close/Last",
+    "price_semantics": "Close/Last (split-comparable observed for NVDA June 2024; cash dividends NOT adjusted)",
+    "dividend_adjusted": false
+  }
+}
