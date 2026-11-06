@@ -65,7 +65,13 @@ class UnifiedRunnerTests(unittest.TestCase):
                 "provider": "mock_yahoo", "sha256": {"NVDA": "a"*64, "QQQ": "b"*64},
                 "first_date": "2026-01-06", "last_date": "2026-01-08",
             }
+            verified = {
+                "ticker": "NVDA", "name": "NVIDIA Corporation",
+                "cik": "0001045810", "query": "NVIDIA", "aliases": ["NVDA", "NVIDIA"],
+                "official_host": "nvidianews.nvidia.com",
+            }
             with patch.object(run_all.core, "ensure_lm_dictionary"), \
+                 patch("news2market.research.symbol_registry.resolve_stock", return_value=verified), \
                  patch.object(run_all, "_news_rows", return_value=([], {})), \
                  patch.object(run_all.research_cli, "command_sec", side_effect=fake_sec), \
                  patch.object(run_all, "_prices", return_value=(fake_events, price_audit)), \
