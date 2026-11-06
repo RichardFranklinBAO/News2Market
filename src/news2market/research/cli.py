@@ -16,7 +16,7 @@ from .identity import validate_rows
 from .metrics import canonical_rows, load_official_lm, measure_rows,tfidf_descriptives,read_articles_csv,write_rows
 from .evaluation import benchmark_human_labels,read_human_labels,EvaluationNotSupported
 
-ROOT=Path(__file__).resolve().parents[2]
+ROOT=Path(__file__).resolve().parents[3]
 LM_PATH=ROOT/'Inputs'/'Loughran-McDonald_MasterDictionary_1993-2025.csv'
 
 

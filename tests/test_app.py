@@ -142,10 +142,10 @@ class CompanySwitchTests(unittest.TestCase):
         repo=Path(__file__).resolve().parents[1]
         for old_entry in ("app.py", "core.py", "web.py"):
             self.assertFalse((repo/old_entry).exists())
-            self.assertTrue((repo/"news2market"/old_entry).exists())
+            self.assertTrue((repo/"src"/"news2market"/old_entry).exists())
 
     def test_webpage_english_only_and_no_yahoo(self):
-        html=(Path(__file__).resolve().parents[1]/"news2market"/"ui"/"index.html").read_text(encoding="utf-8")
+        html=(Path(__file__).resolve().parents[1]/"src"/"news2market"/"ui"/"index.html").read_text(encoding="utf-8")
         self.assertIn('lang="en"',html)
         self.assertIn("Import selected CSV files",html)
         self.assertIn("official Nasdaq",html)

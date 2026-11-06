@@ -11,3 +11,5 @@ gdown>=5.2,<6
 trafilatura>=1.12,<3
 # Descriptive TF-IDF and optional time-ordered independent-label benchmark
 scikit-learn>=1.4,<2
+# Editable install keeps `python -m news2market` working with the src/ layout
+-e .

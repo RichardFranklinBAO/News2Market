@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import urlparse
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "Scripts"
 INPUTS = ROOT / "Inputs"
 RESULTS = ROOT / "Results"

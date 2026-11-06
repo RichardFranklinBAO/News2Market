@@ -13,7 +13,7 @@ import sys
 # One shared limit: SEC extraction must never exceed the research LM scorer's cap.
 from .sec import MAX_TEXT_CHARS as MAX_MEASURED_BODY_CHARS
 
-ROOT=Path(__file__).resolve().parents[2]
+ROOT=Path(__file__).resolve().parents[3]
 
 
 def load_official_lm(dictionary_path: str | Path):
