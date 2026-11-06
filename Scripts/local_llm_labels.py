@@ -1,6 +1,6 @@
-"""News2Market v2.2.4: less-anchored local LLM classification with audit trails.
+"""Optional local LLM classification with explicit source-linked audit trails.
 
-Drop-in replacement for Scripts/12_local_llm_labels.py.
+Requires a separately installed local Ollama model; no paid API.
 No external or paid API calls. A mechanically valid quote is NOT a human-validated
 financial interpretation. Never use labels in research without manual audit.
 """

@@ -266,7 +266,7 @@ def main():
     if args.mode == 'demo':
         rows = read_csv(INPUTS / 'demo_articles.csv')[:max_articles]
         if not rows:
-            raise RuntimeError('Missing synthetic fixture. Execute Scripts/create_demo_inputs.py first.')
+            raise RuntimeError('Missing synthetic test fixture; supply a locally generated offline fixture if needed.')
         fetch_count = 0
     else:
         rows, fetch_count = collect_live(cfg, max_articles)

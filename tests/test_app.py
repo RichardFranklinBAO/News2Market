@@ -144,6 +144,23 @@ class CompanySwitchTests(unittest.TestCase):
             self.assertFalse((repo/old_entry).exists())
             self.assertTrue((repo/"src"/"news2market"/old_entry).exists())
 
+    def test_stage_files_are_named_by_function(self):
+        """Avoid old sequence numbers and verify key dynamic imports."""
+        import re
+        scripts=Path(__file__).resolve().parents[1]/"Scripts"
+        names={p.name for p in scripts.glob("*.py")}
+        expected={
+            "external_article_fetcher.py", "lm_sentiment.py", "event_tagging.py",
+            "nasdaq_csv_parser.py", "text_preparation.py", "lm_cleaning_comparison.py",
+            "local_llm_labels.py", "news_feed_discovery.py", "common.py",
+            "lm_dictionary.py", "nvidia_scraper.py", "signal_core.py"
+        }
+        self.assertEqual(names,expected)
+        self.assertTrue(v.SCRIPT_NAMES.issubset(names))
+        self.assertFalse(any(re.match(r"^[0-9]",s) for s in names))
+        self.assertTrue(callable(v.load_script_module("nasdaq_csv_parser.py","n2m_price_smoke").parse_price_csv))
+        self.assertTrue(callable(v.load_script_module("news_feed_discovery.py","n2m_feed_smoke").discover))
+
     def test_webpage_english_only_and_no_yahoo(self):
         html=(Path(__file__).resolve().parents[1]/"src"/"news2market"/"ui"/"index.html").read_text(encoding="utf-8")
         self.assertIn('lang="en"',html)

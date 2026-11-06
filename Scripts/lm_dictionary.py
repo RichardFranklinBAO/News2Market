@@ -80,7 +80,7 @@ def load_lm_dictionary(path: Path | None = None, min_entries: int = 1000) -> Lex
     if not path.exists():
         raise FileNotFoundError(
             f'Missing official LM dictionary: {path}. '
-            f'Run `python Scripts/00_get_lm_dictionary.py` or download the official CSV from {LM_SOURCE}. '
+            f'Download the official CSV from {LM_SOURCE}. '
             'The full dictionary is NOT bundled, and demo is NOT an LM substitute.')
     raw = path.read_bytes()
     digest = sha256(raw).hexdigest()

@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "Scripts"
 INPUTS = ROOT / "Inputs"
 RESULTS = ROOT / "Results"
-SCRIPT_NAMES = {"05_lm_sentiment.py", "11_prepare_text.py", "11b_lm_cleaned.py", "06_event_tags.py"}
+SCRIPT_NAMES = {"lm_sentiment.py", "text_preparation.py", "lm_cleaning_comparison.py", "event_tagging.py"}
 BENCHMARK = "QQQ"
 MODEL = "qwen2.5:1.5b"
 
@@ -109,12 +109,12 @@ def subtract_years(d, years):
 
 def scripts_on_path():
     if not SCRIPTS.is_dir() or not (SCRIPTS / "lm_dictionary.py").exists():
-        raise FileNotFoundError("Install addon in project ROOT alongside existing Scripts/ and Inputs/")
+        raise FileNotFoundError("Required Scripts/ helper modules are missing; reinstall the complete repository")
     if str(SCRIPTS) not in sys.path:
         sys.path.insert(0, str(SCRIPTS))
 
 
-def import_numeric_script(filename, module_name):
+def load_script_module(filename, module_name):
     scripts_on_path()
     spec = importlib.util.spec_from_file_location(module_name, SCRIPTS / filename)
     if not spec or not spec.loader:
@@ -156,7 +156,7 @@ def _candidate_filter(candidates, profile):
 def discover_news(profile, ticker, from_day, to_day, max_news, use_proxy=False, log=print):
     """News download: existing RSS/publisher extractor plus optional NVIDIA archive adapter."""
     scripts_on_path()
-    rss = import_numeric_script("15_auto_external_news.py", "n2m_rss_collector")
+    rss = load_script_module("news_feed_discovery.py", "n2m_rss_collector")
     import requests
 
     collected=[];audit={"rss_feeds":[],"excluded_candidates":[],"nvidia_issuer_error":None,
@@ -238,7 +238,7 @@ def discover_news(profile, ticker, from_day, to_day, max_news, use_proxy=False, 
 
 def _read_price_csv(path, symbol):
     scripts_on_path()
-    mod=import_numeric_script("07_get_prices.py","n2m_market_import")
+    mod=load_script_module("nasdaq_csv_parser.py","n2m_market_import")
     rows,kind=mod.parse_price_csv(path)
     return {r["date"]:float(r["close"]) for r in rows}, kind
 
@@ -488,7 +488,7 @@ def prices_for_pair(ticker,start,end,price_mode="auto",log=print):
 
 
 def subprocess_stage(script,run_dir,ticker,date_start,date_end,log=print,env_extra=None,allow_error=False):
-    if script not in SCRIPT_NAMES|{"12_local_llm_labels.py"}:
+    if script not in SCRIPT_NAMES|{"local_llm_labels.py"}:
         raise ValueError("Unknown fixed stage")
     ctx={"ticker":ticker,"benchmark":BENCHMARK,"mode":"live", "source":"company_aware_news",
          "start_date":date_start,"end_date":date_end}
@@ -627,7 +627,7 @@ def run_pipeline(options, log=print, news_loader=None, price_loader=None, root_o
         report["news"]={"count":len(cleaned),"audit":news_audit}
         log(f"Qualified article bodies: {len(cleaned)}")
         if cleaned:
-            for name in ["05_lm_sentiment.py","11_prepare_text.py","11b_lm_cleaned.py","06_event_tags.py"]:
+            for name in ["lm_sentiment.py","text_preparation.py","lm_cleaning_comparison.py","event_tagging.py"]:
                 subprocess_stage(name,run,ticker,news_start.isoformat(),today.isoformat(),log=log)
             news_rows=_news_summary(run,cleaned)
             report["news"]["articles"]=news_rows
@@ -638,7 +638,7 @@ def run_pipeline(options, log=print, news_loader=None, price_loader=None, root_o
             if opt["local_llm"]:
                 log("Running optional Qwen2.5:1.5b on at most 5 news articles")
                 try:
-                    code=subprocess_stage("12_local_llm_labels.py",run,ticker,news_start.isoformat(),today.isoformat(),
+                    code=subprocess_stage("local_llm_labels.py",run,ticker,news_start.isoformat(),today.isoformat(),
                         log=log,allow_error=True,env_extra={"N2M_LLM_MODEL":MODEL,
                             "N2M_LLM_MAX_CHARS":"1000","N2M_LLM_CONTEXT":"2048",
                             "N2M_LLM_MAX_ARTICLES":str(min(5,len(cleaned)))})

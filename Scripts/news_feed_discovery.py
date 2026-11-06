@@ -1,11 +1,11 @@
-"""News2Market v2.2.7: automatic third-party news discovery and cautious extraction.
+"""Automatic third-party news discovery and cautious extraction.
 
 One-command discovery: Google News RSS + Bing News RSS + publisher feeds.
 No user-curated article URLs, no GDELT dependency, no paid API.
 No authentication bypass, CAPTCHA bypass, rotating identities or paywall circumvention.
 
 Run (Mac Terminal, inside the News2Market project):
-    python Scripts/15_auto_external_news.py --ticker NVDA --query NVIDIA --days 30 --max-external 5
+    python Scripts/news_feed_discovery.py --ticker NVDA --query NVIDIA --days 30 --max-external 5
 
 Outputs a NEW Results/<ticker>/ExternalAuto/<run_id>/ directory. Does not change LATEST.txt.
 Only extracted full article bodies count as full-text news. RSS summaries are metadata only.
@@ -206,9 +206,9 @@ def page_date(html):
 
 
 def original_fetcher_module():
-    path = SCRIPTS / '03b_scrape_external.py'
+    path = SCRIPTS / 'external_article_fetcher.py'
     if not path.exists():
-        raise RuntimeError('Missing existing Scripts/03b_scrape_external.py; install the complete v2.2 script repair first')
+        raise RuntimeError('Missing existing Scripts/external_article_fetcher.py; reinstall the complete News2Market repository')
     spec = importlib.util.spec_from_file_location('n2m_external_extractor',path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
