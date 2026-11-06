@@ -336,8 +336,10 @@ def run(ticker="NVDA", start=None, end=None, news_days=90,
 
         log("Stage 3/4: loading stock and QQQ market prices")
         price_start = min(start, end - timedelta(days=365 * 5 + 5))
+        effective_price_mode = "nasdaq" if stock_csv else prices
         price_rows, price_audit = _prices(
-            ticker, price_start, end, folder / "prices", prices, log=log)
+            ticker, price_start, end, folder / "prices",
+            effective_price_mode, log=log)
         _write_json(folder / "price_audit.json", price_audit)
         audit["stages"]["prices"] = {
             "provider": price_audit["provider"], "matched_sessions": len(price_rows),
