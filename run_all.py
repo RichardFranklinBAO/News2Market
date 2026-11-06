@@ -238,7 +238,17 @@ def _news_rows(ticker: str, start: date, end: date, max_news: int, log=print):
             continue
         seen.add(url)
         record = dict(row)
+        # Do not convert RSS query matches into "verified exact ticker" matches.
+        # Require separate title/issuer-host evidence before assigning the symbol.
+        from news2market.research.identity import classify
+        record.pop("ticker", None)
+        verified, evidence, reason = classify(record, ticker)
+        if not verified:
+            audit["rejected_unverified_news_identity"] = (
+                audit.get("rejected_unverified_news_identity", 0) + 1)
+            continue
         record["ticker"] = ticker
+        record["company_identity_evidence"] = evidence
         if not record.get("article_id"):
             record["article_id"] = "NEWS-" + hashlib.sha256(url.encode()).hexdigest()[:16]
         cleaned.append(record)
@@ -308,6 +318,7 @@ def run(ticker="NVDA", start=None, end=None, news_days=90,
             "article_id", "ticker", "company", "source", "source_type", "title",
             "url", "published_date", "published_time_quality", "text", "text_chars",
             "retrieved_utc", "synthetic", "extraction_strategy", "extraction_paragraphs",
+            "company_identity_evidence",
         ])
         _write_json(folder / "news_collection_audit.json", news_audit)
         audit["stages"]["news"] = {"records": len(articles), "csv": str(news_csv),
