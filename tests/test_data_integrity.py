@@ -16,11 +16,11 @@ class QualityTests(unittest.TestCase):
         sha256='fake-lexicon'
         def __init__(self):self.calls=[]
         def score(self,title,body,char_cap):
-            self.calls.append((title,body))
+            self.calls.append((title,body,char_cap))
             return {'lm_no_polarity_hits':False,'lm_positive_count':1,'lm_negative_count':0,
                     'lm_uncertainty_count':0,'lm_positive_per_1000':10.0,
                     'lm_negative_per_1000':0.0,'lm_uncertainty_per_1000':0.0,
-                    'lm_polarity_hits':1,'lm_token_count':10,'score':1.0,'lm_text_truncated':False}
+                    'lm_polarity_hits':1,'lm_token_count':10,'score':1.0,'lm_text_truncated':len(body)>char_cap}
 
     def test_metadata_not_scored_even_with_sentiment_title(self):
         lex=self.Lex()
@@ -47,6 +47,50 @@ class QualityTests(unittest.TestCase):
         self.assertEqual(lex.calls[0][0],'')
         self.assertEqual(audit['eligible_complete_bodies'],1)
         self.assertEqual(feat[0]['lm_polarity'],1.0)
+
+    def test_220k_sec_body_scored_without_hidden_second_truncation(self):
+        # 224,000 characters previously passed SEC quality but was cut at 200K by LM.
+        lex=self.Lex()
+        body='revenue growing ' * 14000
+        self.assertEqual(len(body),224000)
+        rows=[{'article_id':'large8k','text':body,'text_status':'extracted',
+               'text_truncated':False,'source_type':'sec_filing_primary_document'}]
+        feat,audit=metrics.measure_rows(rows,lex)
+        self.assertEqual(audit['lm_character_cap'],sec.MAX_TEXT_CHARS)
+        self.assertEqual(len(lex.calls),1)
+        self.assertEqual(len(lex.calls[0][1]),224000)
+        self.assertEqual(lex.calls[0][2],sec.MAX_TEXT_CHARS)
+        self.assertTrue(feat[0]['eligible_for_text_measurement'])
+        self.assertFalse(feat[0]['lm_text_truncated'])
+
+    def test_over_cap_local_body_excluded_from_both_measurements(self):
+        lex=self.Lex()
+        large={'article_id':'overcap','text':'profit improved ' * 16001,
+               'text_status':'extracted','text_truncated':False}
+        self.assertGreater(len(large['text']),sec.MAX_TEXT_CHARS)
+        small=[{'article_id':x,'text':'investment revenue gain and debt ' * 6,'text_status':'extracted'}
+               for x in ('valid1','valid2')]
+        rows=[large]+small
+        feat,audit=metrics.measure_rows(rows,lex)
+        self.assertEqual(feat[0]['text_quality'],'exceeds_measurement_char_cap')
+        self.assertFalse(feat[0]['eligible_for_text_measurement'])
+        self.assertEqual(feat[0]['lm_polarity'],'')
+        self.assertEqual(len(lex.calls),2)
+        self.assertEqual(audit['excluded_by_text_quality']['exceeds_measurement_char_cap'],1)
+        terms,diag=metrics.tfidf_descriptives(rows)
+        self.assertTrue(all(row['article_id']!='overcap' for row in terms))
+        if 'documents' in diag:
+            self.assertEqual(diag['documents'],2)
+
+    def test_secondary_lexicon_truncation_fails_closed(self):
+        class BrokenLex(self.Lex):
+            def score(self,title,body,char_cap):
+                m=super().score(title,body,char_cap)
+                m['lm_text_truncated']=True
+                return m
+        with self.assertRaisesRegex(ValueError,'secondary LM truncation'):
+            metrics.measure_rows([{'article_id':'x','text':'financial report analysis '*6,
+                                   'text_status':'extracted'}],BrokenLex())
 
     def test_text_truncated_string_false_not_misinterpreted(self):
         x={'text':'Growth and investments expected to continue throughout the fiscal year, ' * 3,

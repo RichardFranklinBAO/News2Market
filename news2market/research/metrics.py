@@ -10,6 +10,8 @@ import hashlib
 from pathlib import Path
 import re
 import sys
+# One shared limit: SEC extraction must never exceed the research LM scorer's cap.
+from .sec import MAX_TEXT_CHARS as MAX_MEASURED_BODY_CHARS
 
 ROOT=Path(__file__).resolve().parents[2]
 
@@ -47,7 +49,7 @@ def _as_bool(value):
     return str(value).strip().lower() in ('1','true','yes','y')
 
 
-def text_quality(row, min_body_chars=100):
+def text_quality(row, min_body_chars=100, max_body_chars=MAX_MEASURED_BODY_CHARS):
     """Only complete article/disclosure BODY text is eligible for text features.
 
     A title must not turn a metadata-only or partial disclosure into a result.
@@ -61,19 +63,21 @@ def text_quality(row, min_body_chars=100):
         return 'partial_or_truncated'
     if len(body.strip())<min_body_chars:
         return 'missing_or_short_body'
+    if len(body)>max_body_chars:
+        return 'exceeds_measurement_char_cap'
     # Unspecified status is common for legacy captured news CSVs; it is not a SEC claim.
     if status and status not in ('extracted','complete','full',''):
         return 'unverified_text_status'
     return 'complete_body'
 
 
-def measure_rows(rows,lex,char_cap=200_000):
+def measure_rows(rows,lex,char_cap=MAX_MEASURED_BODY_CHARS):
     """Return audit rows for EVERY document, but score only complete bodies."""
     features=[];missing_polarity=0;exclusions={};scored=0
     for r in rows:
         body=str(r.get('text') or '')
         title=str(r.get('title') or '')
-        quality=text_quality(r)
+        quality=text_quality(r,max_body_chars=char_cap)
         eligible=(quality=='complete_body')
         base={'article_id':r.get('article_id',''), 'ticker':r.get('ticker',''),
               'company_identity_evidence':r.get('company_identity_evidence',''),
@@ -93,6 +97,9 @@ def measure_rows(rows,lex,char_cap=200_000):
         else:
             # Text-only by design: article HEADLINE must not be treated as a disclosure body.
             m=lex.score('',body,char_cap=char_cap)
+            # Fail closed if a different LM implementation silently reduces coverage.
+            if m.get('lm_text_truncated'):
+                raise ValueError('Unexpected secondary LM truncation: the scored text is not a complete body')
             scored+=1
             if m['lm_no_polarity_hits']:missing_polarity+=1
             base.update({'lm_positive_count':m['lm_positive_count'],
@@ -110,7 +117,7 @@ def measure_rows(rows,lex,char_cap=200_000):
         'excluded_from_scoring':len(features)-scored,'excluded_by_text_quality':exclusions,
         'missing_lm_polarity_among_scored':missing_polarity,
         'missing_lm_polarity':missing_polarity,
-        'dictionary_sha256':lex.sha256,
+        'dictionary_sha256':lex.sha256,'lm_character_cap':char_cap,
         'lm_measurement_definition':'BODY ONLY: word counts per 1,000 dictionary-tokenized words; (P-N)/(P+N) when P+N>0; missing/partial text is never scored'}
 
 
