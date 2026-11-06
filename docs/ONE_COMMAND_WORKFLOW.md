@@ -37,13 +37,15 @@ python run_all.py --ticker NVDA --start 2026-01-01 --end 2026-11-06 \
   --max-news 15 --max-filings 50 --prices auto
 ```
 
-- `--prices auto` (default): verified local adjusted-price cache, then Tiingo
-  (with key), Twelve Data (with key), unofficial Yahoo, then previously verified
-  Nasdaq CSVs. Every failure is recorded without a credential; no endless retries.
+- `--prices auto` (default): verified Yahoo stock/QQQ cache, then no-key
+  Yahoo download, then previously verified Nasdaq CSVs. If all fail, the Terminal
+  shows download URLs, filenames, folder and the registration command.
 - `--prices yahoo`: use Yahoo only; a failure is explicit. No silent fallback.
 - `--prices nasdaq`: use an already imported, hash-verified pair at
-  `inputs/prices/<TICKER>.csv` and `inputs/prices/QQQ.csv`, or import both
-  with `--stock-csv /path/to/stock.csv --qqq-csv /path/to/qqq.csv --confirm-nasdaq`.
+  `inputs/prices/<TICKER>.csv` and `inputs/prices/QQQ.csv`. When placing
+  original Nasdaq exports at these canonical names yourself, use
+  `--confirm-nasdaq` once to validate and register. You may also import directly
+  from downloads with `--stock-csv`, `--qqq-csv`, and `--confirm-nasdaq`.
 - `--news-days 90` is the default discovery window; `--start` and `--end`
   override it. `--max-news 15` and `--max-filings 50` are the defaults.
   The SEC collector currently accepts at most 100 filings per call, from recent
@@ -82,67 +84,44 @@ under site access restrictions. The original AAPL/GOOGL/NVDA dashboard remains
 a legacy three-company interface; flexible ticker selection is available via
 `run_all.py`.
 
-## Automatic daily price API providers (v0.4)
+## Keyless prices and actionable Nasdaq fallback (default)
 
-**No CSV downloading is needed** when a supported authenticated provider works.
-The single command is still `python run_all.py` (interactive stock selection) or
-`python run_all.py --ticker TSLA`.
+**No stock-market API key.** The CLI `python run_all.py` first uses a
+recent, source-labeled, SHA256-checked Yahoo stock/QQQ pair cache, then requests
+Yahoo adjusted daily closes using unofficial yfinance. If both are unavailable,
+it tries an already verified **user-confirmed Nasdaq pair**. No Tiingo or Twelve
+Data API tokens are read in the current default workflow.
 
-The new price layer works in this order when `--prices auto`:
+If **all** no-key sources fail, the program prints the **selected stock's
+Nasdaq historical data URL and the QQQ ETF historical data URL** and tells you:
 
-1. A **SHA256-verified, 24-hour local cache** of a complete adjusted stock/QQQ pair.
-2. **Tiingo EOD** if environment variable `TIINGO_API_KEY` is set.
-3. **Twelve Data daily time series** if `TWELVEDATA_API_KEY` is set.
-4. **yfinance** as a no-key, unofficial option; its 429 limits are not retried.
-5. Previously imported, user-attested **Nasdaq raw Close/Last** pair.
+1. Download actual daily historical price CSVs for the stock and QQQ; five years
+   is recommended when available (not required by the CSV parser).
+2. Move the files into the project's `inputs/prices/` directory, renamed
+   `<TICKER>.csv` and `QQQ.csv` (uppercase ticker).
+3. Confirm they are genuine Nasdaq downloads by running:
+   `python run_all.py --ticker TSLA --prices nasdaq --confirm-nasdaq`.
+   Replace TSLA with the real selected ticker. This validates **both** CSVs
+   and writes the required `SOURCE_MANIFEST.json` hash record automatically.
+4. Future runs may use `python run_all.py --ticker TSLA --prices nasdaq` without
+   repeating the source registration.
 
-Each provider supplies **both** the selected stock and QQQ. We never silently
-mix Tiingo adjusted stock prices with Yahoo or raw Nasdaq QQQ prices. Adjusted
-daily price series use dividend/split-adjusted close, while Nasdaq manual CSVs
-use raw Close/Last; outputs explicitly record the distinction.
+It is also supported to **leave original files in Downloads** and run:
+`python run_all.py --ticker TSLA --prices nasdaq --stock-csv /real/path/stock.csv
+--qqq-csv /real/path/qqq.csv --confirm-nasdaq`. Use actual file paths.
+Never attest to a non-Nasdaq source as Nasdaq. The CSV itself often has no
+embedded ticker and the explicit attestation establishes the attribution.
 
-### Setting up an API key (one-time)
-
-Sign up directly at [Tiingo](https://www.tiingo.com/) or
-[Twelve Data](https://twelvedata.com/). The respective API keys are private.
-Never paste them in GitHub issues, logs, research CSVs, or public repositories.
-
-For the active Terminal shell:
-
-```bash
-export TIINGO_API_KEY="YOUR_PRIVATE_TIINGO_TOKEN"
-# Or use:
-export TWELVEDATA_API_KEY="YOUR_PRIVATE_TWELVE_DATA_KEY"
-python run_all.py --ticker TSLA
-```
-
-For a **specific** provider without fallback:
-
-```bash
-python run_all.py --ticker TSLA --prices tiingo
-python run_all.py --ticker TSLA --prices twelvedata
-```
-
-Only call those commands when the matching environment variable is set.
-No credential is required for the Yahoo attempt or for already verified Nasdaq
-local CSVs. A failed provider is documented with a sanitized reason, without
-publishing the token; rate-limited responses are not automatically retried.
-
-Prices are cached under `inputs/cache/market_prices/<TICKER>/<PROVIDER>/`.
-Each cache contains a paired daily-price CSV and SHA256 manifest. Cache reads
-check ticker, provider, requested date coverage, freshness and file integrity.
-A cache that is stale, incomplete, altered or from the wrong provider is refused.
-
-Provider-specific practical caveats: Tiingo's EOD `adjClose` incorporates
-split and dividend adjustments. Twelve Data is called with `adjust=all`;
-free-tier history/coverage might still be limited by the user's plan and will
-be reported as a provider failure. Both generally require a free signup and
-an API key. yfinance is unofficial and can hit HTTP 429. No paid plans are
-automatically purchased.
-
-**An API success is not necessarily research success.** Insufficient historical
-news full text and nonvalidated publication times are independent limitations.
-Predictions are never generated just because market prices became available.
+**Limitation:** Yahoo/yfinance is an unofficial, no-key interface. It may
+be rate-limited, restricted or changed without notice; there is no guaranteed
+availability. If download fails, manual Nasdaq export is the reliable
+documented fallback but not fully automated. Price adjustment differs:
+Yahoo adjusted daily Close versus Nasdaq raw Close/Last, and a run cannot
+silently mix them. A future optional **user-provided API key** integration
+may restore Tiingo/Twelve Data/another provider after API coverage, plans,
+licensing and reliability are independently reviewed. The key-based adapters
+are not part of the current default CLI path. The SEC User-Agent with real
+contact details is **still required**, but it is not a financial-price API key.
 
 ## Manual Nasdaq CSV naming and automatic import
 
@@ -210,7 +189,8 @@ in each run's audit.
 2. Collect identified 8-K/10-Q/10-K primary SEC documents with a declared
    User-Agent. Combine and remeasure News + SEC using the *same* LM dictionary
    with the existing identity and text-quality checks.
-3. Acquire verified stock/QQQ historical closes using the selected provider.
+3. Use the already preflight-validated stock/QQQ price pair; the price stage runs
+   *before* any network text collection so failures stop early.
 4. Align events with future relative stock-versus-QQQ returns and attempt the
    time-ordered source-specific holdout diagnostic.
 
