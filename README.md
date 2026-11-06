@@ -22,6 +22,34 @@ News2Market is an independent Python research prototype. It collects company-rel
 
 This demonstrates **research data engineering and text-measurement integrity**, not validated market forecasting or causal identification.
 
+## Fully automatic historical stock prices (v0.4)
+
+**No manual CSV needed when a working market-data API is configured.** The same
+interactive `python run_all.py` automatically attempts a SHA256-checked local
+cache, then a configured **Tiingo** API, a configured **Twelve Data** API,
+unofficial Yahoo Finance, and finally an already user-confirmed local Nasdaq
+pair. Failed providers do not silently supply synthetic prices or mixed
+stock-versus-QQQ price adjustment bases.
+
+One-time setup (use either market-data provider's account/API key):
+
+```bash
+cd ~/Downloads/News2Market-main
+python -m pip install -r requirements.txt
+export N2M_SEC_USER_AGENT="Your Real Name your-real-email@example.com"
+export TIINGO_API_KEY="YOUR_PRIVATE_TIINGO_TOKEN"
+# Alternatively: export TWELVEDATA_API_KEY="YOUR_PRIVATE_TWELVE_DATA_KEY"
+python run_all.py
+```
+
+The program prompts for a current US exchange-listed stock ticker and collects
+the paired stock/QQQ adjusted close series automatically. **Never commit API
+tokens**; they are read from environment variables. If all API attempts fail,
+manual Nasdaq imports remain a last resort. Historical news full-body coverage
+and independent forward-return inference remain separate limitations.
+
+See [automatic API/provider setup and limitations](docs/ONE_COMMAND_WORKFLOW.md).
+
 ## Start here: where to put downloaded Nasdaq CSVs
 
 **Easiest method: leave the original Nasdaq files in `~/Downloads/`.** You do not need to rename or move them yourself. For a TSLA study, download **both TSLA and QQQ** historical CSVs directly from Nasdaq, then run from the project folder:
