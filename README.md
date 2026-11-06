@@ -24,6 +24,15 @@ This demonstrates **research data engineering and text-measurement integrity**, 
 
 ## Quick Start
 
+**Choose one of two independent workflows** (both use the official LM dictionary):
+
+| Workflow | Purpose | Additional input | Start |
+|---|---|---|---|
+| **News + Market Report** | Scrape firm news and explore LM text scores alongside stock/QQQ price returns | Manually imported Nasdaq stock and QQQ CSVs | `python -m news2market --web` |
+| **SEC Collection + LM Analysis** | Retrieve and audit 8-K/10-Q/10-K primary documents, then score complete bodies | Genuine SEC User-Agent; **no Nasdaq CSV required** | `python -m news2market research sec ... --fetch-bodies` |
+
+**[Detailed Mac walkthrough for both workflows](docs/TWO_WORKFLOWS.md)** — including exact commands, result locations, and what constitutes a successful check.
+
 Python **3.11–3.12** recommended. Install from a fresh clone:
 
 ~~~bash
