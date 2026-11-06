@@ -13,6 +13,20 @@ News2Market integrates U.S. company news (Workflow A), SEC EDGAR disclosures (Wo
 - **Empirical alignment:** matched stock/QQQ daily prices, 1/3/5-session relative price returns, and source-specific News/SEC features.
 - **Research safeguards:** exclusion and provenance audits, same-day event aggregation, and a conditional chronological holdout that returns `insufficient_evidence` when samples are inadequate.
 
+### Pre-doctoral research skills demonstrated
+
+Built as a technical work sample for **Economics/Finance Predoc RA roles, including Northwestern**. The project demonstrates several responsibilities highlighted in such positions:
+
+| Research responsibility | Evidence in News2Market |
+|---|---|
+| **Statistical analysis in Python** | Event-to-market return alignment, day-level aggregation and an exploratory NVDA OLS/HC1 analysis; results and non-findings reported transparently. |
+| **Web scraping and alternative data** | Automated discovery/extraction of company news alongside official SEC EDGAR filings, with issuer and source checks. |
+| **Creating research datasets from text** | Parsed, deduplicated, quality-screened News/SEC records joined to historical stock/QQQ outcomes, with reproducible audit trails. |
+| **Python-based NLP and machine learning** | LM sentiment features and descriptive TF-IDF; a source-aware Ridge holdout *implemented but not fitted* because the live sample failed the minimum-data gate. |
+| **Writing research results** | An English [Research Note](docs/RESEARCH_NOTE_PHASE_I.md), methodological documentation, and explicit limitations/negative findings. |
+
+**Scope:** This work does **not** claim OCR, randomized experiments, formal literature reviews, structural/dynamic economic modeling, or validated predictive performance. Those are distinct research skills, not completed components of this project.
+
 ### NLP research roadmap
 
 | Layer | Research goal | Phase I status |
