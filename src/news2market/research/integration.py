@@ -222,5 +222,26 @@ def run_market_integration(ticker, features_csv, output_folder, *, min_direction
         "- QQQ contains each analyzed company; observations sharing dates and multi-day horizons overlap.",
         "- See market_alignment_audit.json for missingness, price coverage, source groups and other limitations.",
     ]
+    from .validation import write_market_validation
+    validation = write_market_validation(events, output)
+    audit["predictive_validation"] = {
+        "status": validation["status"],
+        "n_informative_distinct_days": validation["n_informative_distinct_days"],
+        "reason": validation.get("reason"),
+        "beat_no_text_on_rmse": validation.get("beat_no_text_on_rmse"),
+    }
+    (output / "market_alignment_audit.json").write_text(
+        json.dumps(audit, indent=2), encoding="utf-8")
+    summary.extend(["",
+        "## Time-ordered incremental-information validation",
+        "",
+        f"- Status: `{validation['status']}`.",
+        f"- Distinct informative signal days: {validation['n_informative_distinct_days']}.",
+        "- See market_signal_validation.json and market_holdout_predictions.csv.",
+        "- The fixed-source-feature Ridge model is compared to a training-mean no-text baseline.",
+        "- This is an exploratory holdout diagnostic, **not** an actionable trading strategy.",
+    ])
+    if validation.get("reason"):
+        summary.append(f"- No estimate: {validation['reason']}.")
     (output / "market_alignment_report.md").write_text("\n".join(summary) + "\n", encoding="utf-8")
     return audit
