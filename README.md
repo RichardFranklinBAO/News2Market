@@ -29,8 +29,17 @@ From the project root, install dependencies and provide a genuine SEC User-Agent
 ```bash
 python -m pip install -r requirements.txt
 export N2M_SEC_USER_AGENT="Your Real Name your-real-email@example.com"
-python run_all.py --ticker NVDA
+python run_all.py                 # Terminal prompts for an actual US stock symbol
+python run_all.py --ticker MSFT   # Or supply an explicit symbol directly
 ```
+
+The unified runner verifies SEC CIK/exchange and Nasdaq Trader listing records
+for the selected ticker; it is no longer limited to NVDA/AAPL/GOOGL.
+Canonical user-attested Nasdaq files are stored as
+`inputs/prices/<TICKER>.csv` and `inputs/prices/QQQ.csv`, with a SHA256
+`SOURCE_MANIFEST.json`. See the full guide for the explicit `--stock-csv`
+and `--qqq-csv` import flags. The legacy dashboard remains limited to three
+companies.
 
 This runs News collection, SEC document retrieval, unified LM measurement,
 automatic adjusted historical stock/QQQ price download via unofficial
