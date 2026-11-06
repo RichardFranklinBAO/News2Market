@@ -211,7 +211,13 @@ def _prices(ticker: str, start: date, end: date, folder: Path, mode: str, log=pr
             return rows, audit
         except Exception as exc:
             errors.append("Nasdaq: " + str(exc)[:250])
-    raise RuntimeError("No usable source-verified price pair: " + "; ".join(errors))
+    raise RuntimeError(
+        "No usable source-verified price pair for " + ticker + ": " + "; ".join(errors)
+        + ". If Yahoo is rate-limited, do not retry repeatedly. "
+        + "Download the actual ticker and QQQ historical CSVs from Nasdaq, then run: "
+        + "python run_all.py --ticker " + ticker
+        + " --prices nasdaq --stock-csv /path/to/stock.csv "
+        + "--qqq-csv /path/to/QQQ.csv --confirm-nasdaq")
 
 
 def _news_rows(ticker: str, start: date, end: date, max_news: int, log=print):
@@ -311,7 +317,19 @@ def run(ticker="NVDA", start=None, end=None, news_days=90,
     }
     _write_json(folder / "unified_audit.json", audit)
     try:
-        log("Stage 1/4: collecting source-identified News")
+        log("Stage 1/4: verifying stock and QQQ prices before network text collection")
+        price_start = min(start, end - timedelta(days=365 * 5 + 5))
+        effective_price_mode = "nasdaq" if stock_csv else prices
+        price_rows, price_audit = _prices(
+            ticker, price_start, end, folder / "prices",
+            effective_price_mode, log=log)
+        _write_json(folder / "price_audit.json", price_audit)
+        audit["stages"]["prices"] = {
+            "provider": price_audit["provider"], "matched_sessions": len(price_rows),
+            "first_date": price_audit["first_date"], "last_date": price_audit["last_date"],
+        }
+
+        log("Stage 2/4: collecting source-identified News")
         articles, news_audit = _news_rows(ticker, start, end, max_news, log=log)
         news_csv = folder / "news_articles.csv"
         research_cli.write_rows(news_csv, articles, fields=[
@@ -323,9 +341,12 @@ def run(ticker="NVDA", start=None, end=None, news_days=90,
         _write_json(folder / "news_collection_audit.json", news_audit)
         audit["stages"]["news"] = {"records": len(articles), "csv": str(news_csv),
                                    "sha256": _sha(news_csv)}
+        if not articles:
+            audit["limitations"].append(
+                "No eligible full-body News articles: market study can only assess SEC text for this run")
         log(f"News: {len(articles)} eligible collected bodies")
 
-        log("Stage 2/4: collecting SEC EDGAR and remeasuring combined corpus")
+        log("Stage 3/4: collecting SEC EDGAR and remeasuring combined corpus")
         sec_args = SimpleNamespace(
             ticker=ticker, start=start.isoformat(), end=end.isoformat(),
             max_filings=max_filings, fetch_bodies=True, sec_user_agent=agent,
@@ -344,18 +365,6 @@ def run(ticker="NVDA", start=None, end=None, news_days=90,
             "quality_report": str(sec_folder / "sec_data_quality_report.md"),
         }
         log(f"SEC: {sec_audit['disclosures_selected']} filings selected")
-
-        log("Stage 3/4: loading stock and QQQ market prices")
-        price_start = min(start, end - timedelta(days=365 * 5 + 5))
-        effective_price_mode = "nasdaq" if stock_csv else prices
-        price_rows, price_audit = _prices(
-            ticker, price_start, end, folder / "prices",
-            effective_price_mode, log=log)
-        _write_json(folder / "price_audit.json", price_audit)
-        audit["stages"]["prices"] = {
-            "provider": price_audit["provider"], "matched_sessions": len(price_rows),
-            "first_date": price_audit["first_date"], "last_date": price_audit["last_date"],
-        }
 
         log("Stage 4/4: aligning and validating News + SEC signals vs QQQ")
         market_folder = folder / "market"
