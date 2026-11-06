@@ -107,10 +107,13 @@ def _price_rows_from_yahoo(ticker: str, start: date, end: date, folder: Path):
 def _price_rows_from_nasdaq(ticker: str):
     """Only use previously user-confirmed and hash-verified Nasdaq inputs."""
     for sym in (ticker, "QQQ"):
-        core._reuse_previous_project_csv(sym, log=lambda _: None)
-    state = core.price_status(ticker)
-    if not state["ready"]:
-        raise RuntimeError("Verified local Nasdaq stock and QQQ CSVs are not both ready")
+        if sym in core.NAS_PRICE_LINKS:
+            core._reuse_previous_project_csv(sym, log=lambda _: None)
+        path = core.INPUTS / "prices" / (sym + ".csv")
+        if not path.is_file() or not core._nasdaq_evidence(sym, path):
+            raise RuntimeError(
+                f"Missing verified local Nasdaq file for {sym}: "
+                "import via --stock-csv and --qqq-csv with --confirm-nasdaq")
     asset, _ = core._read_price_csv(core.INPUTS / "prices" / (ticker + ".csv"), ticker)
     qqq, _ = core._read_price_csv(core.INPUTS / "prices" / "QQQ.csv", "QQQ")
     overlap = sorted(set(asset) & set(qqq))
@@ -128,6 +131,63 @@ def _price_rows_from_nasdaq(ticker: str):
         "limitations": ["Manually imported data may end before recent event dates"],
     }
     return rows, audit
+
+
+def import_nasdaq_pair(ticker: str, stock_csv: Path, qqq_csv: Path,
+                       *, confirmed_nasdaq=False):
+    """One-time explicit ticker attribution and safe local import of Nasdaq CSV pair.
+
+    Nasdaq export has no built-in symbol field, so user must attest file origin.
+    Both files are validated before either destination is changed.
+    """
+    if not confirmed_nasdaq:
+        raise ValueError("Use --confirm-nasdaq only for genuine Nasdaq downloaded price files")
+    from news2market.research.symbol_registry import canonical_symbol
+    ticker = canonical_symbol(ticker)
+    originals = {ticker: Path(stock_csv), "QQQ": Path(qqq_csv)}
+    validated = {}
+    for sym, src in originals.items():
+        if not src.is_file() or src.stat().st_size > 5_000_000:
+            raise ValueError(f"Missing or oversized Nasdaq CSV for {sym}: {src}")
+        # Enforce genuine Nasdaq Date,Close/Last format; no synthetic substitution.
+        raw = src.read_bytes()
+        text = raw.decode("utf-8-sig")
+        import io
+        header = next(csv.reader(io.StringIO(text)), [])
+        normalized = {"".join(c for c in str(x).lower() if c.isalnum())
+                      for x in header}
+        if not {"date", "closelast"}.issubset(normalized):
+            raise ValueError(f"{src.name}: require Nasdaq Date and Close/Last columns")
+        core.scripts_on_path()
+        from nasdaq_csv_parser import parse_price_csv
+        rows, basis = parse_price_csv(src)
+        if len(rows) < 3 or basis != "raw_close_unadjusted":
+            raise ValueError(f"{src.name}: invalid Nasdaq raw close export")
+        validated[sym] = {"raw": raw, "rows": rows,
+                          "sha256": hashlib.sha256(raw).hexdigest()}
+    folder = core.INPUTS / "prices"
+    folder.mkdir(parents=True, exist_ok=True)
+    # This is a user-attested origin, never an independently provider-signed file.
+    manifest = core._nasdaq_manifest()
+    for sym, meta in validated.items():
+        target = folder / (sym + ".csv")
+        temp = folder / ("." + sym + ".tmp")
+        temp.write_bytes(meta["raw"])
+        os.replace(temp, target)
+        manifest[sym] = {
+            "source": "User-attested Nasdaq historical CSV import",
+            "sha256": meta["sha256"], "rows": len(meta["rows"]),
+            "first_date": meta["rows"][0]["date"],
+            "last_date": meta["rows"][-1]["date"],
+            "price_semantics": "Nasdaq raw Close/Last, not dividend-adjusted",
+            "ticker_identity": "User-specified file-to-ticker attribution",
+            "imported_utc": datetime.now(timezone.utc).isoformat(),
+        }
+    tmp = folder / ".SOURCE_MANIFEST.tmp"
+    tmp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    os.replace(tmp, folder / "SOURCE_MANIFEST.json")
+    return {sym: {"rows": len(v["rows"]), "sha256": v["sha256"]}
+            for sym, v in validated.items()}
 
 
 def _prices(ticker: str, start: date, end: date, folder: Path, mode: str, log=print):
@@ -187,10 +247,12 @@ def _news_rows(ticker: str, start: date, end: date, max_news: int, log=print):
 
 def run(ticker="NVDA", start=None, end=None, news_days=90,
         max_news=15, max_filings=50, prices="auto", agent=None,
-        output_root=None, log=print):
+        output_root=None, log=print, stock_csv=None, qqq_csv=None,
+        confirm_nasdaq=False):
     ticker = ticker.upper()
-    if ticker not in core.COMPANIES:
-        raise ValueError("Supported tickers: NVDA, AAPL, GOOGL")
+    from news2market.research.symbol_registry import canonical_symbol, resolve_stock
+    from news2market.research.identity import register_issuer
+    ticker = canonical_symbol(ticker)
     end = date.fromisoformat(end) if isinstance(end, str) else (end or datetime.now(timezone.utc).date())
     if start:
         start = date.fromisoformat(start) if isinstance(start, str) else start
@@ -206,6 +268,22 @@ def run(ticker="NVDA", start=None, end=None, news_days=90,
     if not valid_agent(agent):
         raise ValueError("Set N2M_SEC_USER_AGENT to your real name and contact email before running")
     core.ensure_lm_dictionary(log=log)
+    # Exact current listing/CIK check precedes any text or price collection.
+    registry = resolve_stock(ticker, agent, core.INPUTS / "cache" / "symbol_registry")
+    if ticker not in core.COMPANIES:
+        core.COMPANIES[ticker] = {
+            "name": registry["name"], "label": registry["name"],
+            "query": registry["query"], "aliases": registry["aliases"],
+            "official_feed": None, "official_host": "",
+            "cik": registry["cik"], "has_issuer_scraper": False,
+        }
+    register_issuer({**registry, "official_host":
+                     core.COMPANIES[ticker].get("official_host", "")})
+    if bool(stock_csv) != bool(qqq_csv):
+        raise ValueError("--stock-csv and --qqq-csv must be supplied together")
+    if stock_csv:
+        import_nasdaq_pair(ticker, Path(stock_csv), Path(qqq_csv),
+                           confirmed_nasdaq=confirm_nasdaq)
     out_root = Path(output_root) if output_root else core.RESULTS
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     folder = out_root / ticker / "Unified" / stamp
@@ -213,7 +291,7 @@ def run(ticker="NVDA", start=None, end=None, news_days=90,
     audit = {
         "ticker": ticker, "status": "running",
         "window": {"start": start.isoformat(), "end": end.isoformat()},
-        "folder": str(folder), "stages": {},
+        "folder": str(folder), "stages": {}, "issuer_registry": registry,
         "limitations": [
             "Historical RSS/news discovery may not provide full backfill",
             "SEC recent submissions are not a complete historical filing archive",
@@ -290,20 +368,34 @@ def run(ticker="NVDA", start=None, end=None, news_days=90,
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="One-command News + SEC + LM + QQQ research")
-    parser.add_argument("--ticker", default="NVDA", choices=list(core.COMPANIES))
+    parser.add_argument("--ticker", default=None, help="US stock symbol e.g. NVDA, MSFT, AMD, TSLA")
+    parser.add_argument("--interactive", action="store_true", help="Prompt for a US stock ticker in Terminal")
     parser.add_argument("--start", default=None, help="YYYY-MM-DD; default end minus news-days")
     parser.add_argument("--end", default=None, help="YYYY-MM-DD inclusive; default today UTC")
     parser.add_argument("--news-days", type=int, default=90)
     parser.add_argument("--max-news", type=int, default=15)
     parser.add_argument("--max-filings", type=int, default=50)
     parser.add_argument("--prices", choices=["auto", "yahoo", "nasdaq"], default="auto")
+    parser.add_argument("--stock-csv", type=Path, help="User-downloaded Nasdaq company historical CSV")
+    parser.add_argument("--qqq-csv", type=Path, help="User-downloaded Nasdaq QQQ historical CSV")
+    parser.add_argument("--confirm-nasdaq", action="store_true",
+                        help="Attest both selected CSV files came from Nasdaq historical downloads")
     parser.add_argument("--sec-user-agent", default=None, help="Real name and contact email")
     parser.add_argument("--output-root", default=None, type=Path)
     args = parser.parse_args(argv)
+    if args.interactive or (args.ticker is None):
+        import sys
+        if not sys.stdin.isatty():
+            parser.error("Provide --ticker for non-interactive execution")
+        print("News2Market — US Stock Research")
+        print("Enter a real US stock ticker (examples: NVDA, AAPL, MSFT, AMD, TSLA)")
+        args.ticker = input("Stock ticker: ").strip().upper()
     result = run(ticker=args.ticker, start=args.start, end=args.end,
                  news_days=args.news_days, max_news=args.max_news,
                  max_filings=args.max_filings, prices=args.prices,
-                 agent=args.sec_user_agent, output_root=args.output_root)
+                 agent=args.sec_user_agent, output_root=args.output_root,
+                 stock_csv=args.stock_csv, qqq_csv=args.qqq_csv,
+                 confirm_nasdaq=args.confirm_nasdaq)
     print(json.dumps({
         "status": result["status"], "run_folder": result["folder"],
         "news": result["stages"].get("news", {}).get("records"),
