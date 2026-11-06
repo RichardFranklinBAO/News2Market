@@ -13,6 +13,22 @@ ISSUERS = {
     'GOOGL':{'cik':'1652044','titles':(r'\balphabet\b',r'\bgoogle\b',r'\bgoogl\b'), 'host':'blog.google'},
 }
 
+def register_issuer(profile):
+    """Register an independently CIK-verified issuer in this process."""
+    ticker=str(profile.get("ticker") or "").upper()
+    cik=str(profile.get("cik") or "")
+    if not ticker or not cik.isdigit():
+        raise ValueError("Dynamic issuer requires ticker and SEC CIK")
+    name=str(profile.get("name") or "").strip()
+    names=[name, str(profile.get("query") or "")]
+    titles=tuple(r"\\b"+re.escape(x)+r"\\b" for x in [ticker]+names
+                 if len(x) >= 3)
+    ISSUERS[ticker] = {
+        "cik": str(int(cik)), "titles": titles,
+        "host": str(profile.get("official_host") or ""),
+    }
+
+
 def _normalize_cik(value):
     if value is None or str(value).strip()=='':return ''
     s=str(value).strip()
@@ -55,7 +71,7 @@ def classify(row,ticker):
         host=(urlparse(str(row.get('url') or '')).hostname or '').lower()
     except ValueError:host=''
     # Only explicitly issuer-owned hosts; never treat search/publisher domains as issuer proof.
-    if host==profile['host'] or host.endswith('.'+profile['host']):
+    if profile['host'] and (host==profile['host'] or host.endswith('.'+profile['host'])):
         return True,'issuer_host_heuristic','issuer host is not a verified document-level match'
     return False,'unverified','No company ticker, CIK, SEC URL CIK or unambiguous title/issuer-host evidence'
 
