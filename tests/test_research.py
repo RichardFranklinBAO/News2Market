@@ -94,6 +94,22 @@ class TextMeasurementTests(unittest.TestCase):
             self.assertGreater(len(got),0)
         else:self.assertEqual(audit['status'],'sklearn_not_installed')
 
+    def test_large_sec_csv_body_is_read_without_default_field_limit(self):
+        # Regression: 10-Q/10-K text in a single CSV cell can exceed 131072.
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/'sec_corpus.csv'
+            original_body='Revenue and operations. ' * 8000
+            self.assertGreater(len(original_body),131072)
+            self.assertLess(len(original_body),sec.MAX_TEXT_CHARS)
+            with p.open('w',encoding='utf-8',newline='') as out:
+                writer=csv.DictWriter(out,fieldnames=['article_id','ticker','text'])
+                writer.writeheader()
+                writer.writerow({'article_id':'sec-large','ticker':'NVDA','text':original_body})
+            loaded=metrics.read_articles_csv(p)
+            self.assertEqual(len(loaded),1)
+            self.assertEqual(loaded[0]['text'],original_body)
+            self.assertEqual(metrics.text_quality(loaded[0]),'complete_body')
+
     def test_no_arbitrary_input_csv(self):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/'x.csv';p.write_text('article_id,title\na,Test\n')
