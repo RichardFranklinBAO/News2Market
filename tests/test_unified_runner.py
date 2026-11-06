@@ -47,23 +47,43 @@ class UnifiedRunnerTests(unittest.TestCase):
                                 date(2026, 1, 9), Path("/tmp"), "yahoo")
             nasdaq.assert_not_called()
 
-    def test_priority_keyed_api_and_cache(self):
+    def test_auto_ignores_api_keys_and_uses_yahoo_only(self):
         rows = [{"date": "2026-01-06", "NVDA_close": 120, "QQQ_close": 100}]
-        audit = {"provider": "tiingo_eod_adjusted", "price_basis": "Tiingo adjClose",
-                 "sha256": {"NVDA": "a"*64, "QQQ": "b"*64},
-                 "first_date": "2026-01-06", "last_date": "2026-01-06"}
-        with patch("news2market.research.price_providers.read_pair_cache", return_value=None), \
-             patch.dict("os.environ", {"TIINGO_API_KEY": "test-key",
-                                       "TWELVEDATA_API_KEY": ""}), \
-             patch("news2market.research.price_providers.tiingo_pair",
-                   return_value=(rows, audit)) as tiingo, \
-             patch("news2market.research.price_providers.save_pair_cache"), \
-             patch.object(run_all, "_price_rows_from_yahoo") as yahoo:
+        audit = {
+            "provider": "yahoo_via_unofficial_yfinance",
+            "price_basis": "yfinance adjusted daily Close",
+            "sha256": {"NVDA": "a"*64, "QQQ": "b"*64},
+            "first_date": "2026-01-06", "last_date": "2026-01-06",
+        }
+        with patch("news2market.research.price_providers.read_pair_cache", return_value=None), \\
+             patch.dict("os.environ", {"TIINGO_API_KEY": "SHOULD_NOT_BE_USED",
+                                       "TWELVEDATA_API_KEY": "SHOULD_NOT_BE_USED"}), \\
+             patch.object(run_all, "_price_rows_from_yahoo", return_value=(rows, audit)) as yahoo, \\
+             patch.object(run_all, "_price_rows_from_nasdaq") as nasdaq, \\
+             patch("news2market.research.price_providers.tiingo_pair") as tiingo, \\
+             patch("news2market.research.price_providers.twelvedata_pair") as twelvedata, \\
+             patch("news2market.research.price_providers.save_pair_cache"):
             _, out = run_all._prices("NVDA", date(2026,1,1),
                                      date(2026,1,9), Path("/tmp"), "auto")
-            tiingo.assert_called_once()
-            yahoo.assert_not_called()
-        self.assertEqual(out["provider"], "tiingo_eod_adjusted")
+            yahoo.assert_called_once()
+            nasdaq.assert_not_called()
+            tiingo.assert_not_called()
+            twelvedata.assert_not_called()
+        self.assertEqual(out["provider"], "yahoo_via_unofficial_yfinance")
+
+    def test_keyless_failure_prints_real_ticker_nasdaq_urls(self):
+        with patch("news2market.research.price_providers.read_pair_cache", return_value=None), \\
+             patch.object(run_all, "_price_rows_from_yahoo", side_effect=RuntimeError("rate limited")), \\
+             patch.object(run_all, "_price_rows_from_nasdaq", side_effect=RuntimeError("CSV missing")):
+            with self.assertRaises(run_all.PriceUnavailableError) as ctx:
+                run_all._prices("TSLA", date(2026,1,1), date(2026,1,9), Path("/tmp"), "auto")
+        message = str(ctx.exception)
+        self.assertIn("nasdaq.com/market-activity/stocks/tsla/historical", message)
+        self.assertIn("nasdaq.com/market-activity/etf/qqq/historical", message)
+        self.assertIn("TSLA.csv", message)
+        self.assertIn("QQQ.csv", message)
+        self.assertIn("--confirm-nasdaq", message)
+        self.assertIn("SOURCE_MANIFEST.json", message)
 
     def test_invalid_sec_agent_fails_before_network(self):
         with patch.object(run_all.core, "ensure_lm_dictionary") as lm:
