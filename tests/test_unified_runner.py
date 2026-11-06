@@ -55,13 +55,13 @@ class UnifiedRunnerTests(unittest.TestCase):
             "sha256": {"NVDA": "a"*64, "QQQ": "b"*64},
             "first_date": "2026-01-06", "last_date": "2026-01-06",
         }
-        with patch("news2market.research.price_providers.read_pair_cache", return_value=None), \\
+        with patch("news2market.research.price_providers.read_pair_cache", return_value=None), \
              patch.dict("os.environ", {"TIINGO_API_KEY": "SHOULD_NOT_BE_USED",
-                                       "TWELVEDATA_API_KEY": "SHOULD_NOT_BE_USED"}), \\
-             patch.object(run_all, "_price_rows_from_yahoo", return_value=(rows, audit)) as yahoo, \\
-             patch.object(run_all, "_price_rows_from_nasdaq") as nasdaq, \\
-             patch("news2market.research.price_providers.tiingo_pair") as tiingo, \\
-             patch("news2market.research.price_providers.twelvedata_pair") as twelvedata, \\
+                                       "TWELVEDATA_API_KEY": "SHOULD_NOT_BE_USED"}), \
+             patch.object(run_all, "_price_rows_from_yahoo", return_value=(rows, audit)) as yahoo, \
+             patch.object(run_all, "_price_rows_from_nasdaq") as nasdaq, \
+             patch("news2market.research.price_providers.tiingo_pair") as tiingo, \
+             patch("news2market.research.price_providers.twelvedata_pair") as twelvedata, \
              patch("news2market.research.price_providers.save_pair_cache"):
             _, out = run_all._prices("NVDA", date(2026,1,1),
                                      date(2026,1,9), Path("/tmp"), "auto")
@@ -72,8 +72,8 @@ class UnifiedRunnerTests(unittest.TestCase):
         self.assertEqual(out["provider"], "yahoo_via_unofficial_yfinance")
 
     def test_keyless_failure_prints_real_ticker_nasdaq_urls(self):
-        with patch("news2market.research.price_providers.read_pair_cache", return_value=None), \\
-             patch.object(run_all, "_price_rows_from_yahoo", side_effect=RuntimeError("rate limited")), \\
+        with patch("news2market.research.price_providers.read_pair_cache", return_value=None), \
+             patch.object(run_all, "_price_rows_from_yahoo", side_effect=RuntimeError("rate limited")), \
              patch.object(run_all, "_price_rows_from_nasdaq", side_effect=RuntimeError("CSV missing")):
             with self.assertRaises(run_all.PriceUnavailableError) as ctx:
                 run_all._prices("TSLA", date(2026,1,1), date(2026,1,9), Path("/tmp"), "auto")
