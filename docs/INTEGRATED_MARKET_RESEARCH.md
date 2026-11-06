@@ -59,3 +59,20 @@ Repeat with `--ticker AAPL` or `GOOGL` when you have that issuer's own verified 
 ## When is a real Buy/Sell study justified?
 
 Only after a larger historical corpus with verified market-availability dates, substantive filing exhibits, independently defined labels, pre-registered trading rules, transaction costs and time-ordered *out-of-sample* testing. Useful primary evaluation outcomes would include the direction and magnitude of 1/3/5-session excess returns, uncertainty intervals, coverage, stability by filing type, and comparison with a **no-text baseline**. A small, selected 15-filing SEC pilot cannot support a profitable trading strategy claim.
+
+## Incremental LM signal validation (experimental)
+
+The same `research market` command now also attempts a **time-ordered, source-aware holdout experiment** after the descriptive alignment. It adds:
+
+- `market_signal_validation.json`: audit, independent day count, chronological training/holdout diagnostics, text model and no-text baseline scores, and limitations.
+- `market_holdout_predictions.csv`: one row per distinct held-out signal day, with actual 1-session stock-minus-QQQ return, both forecasts, and source-specific LM features. It is header-only when validation is unsupported.
+
+**Unit of analysis:** one distinct eligible signal close, NOT one article. News and SEC polarity averages are retained as *separate* predictors, with source-present indicators so that an absent source is never silently interpreted as neutral. Same-day repeated documents therefore cannot multiply the return label. The lexical-insufficiency gate removes low-hit documents from directional forecasting inputs without deleting the descriptive audit.
+
+**Fixed provisional evaluation design:** at least 40 unique informative signal days, with at least 25 training and 10 later holdout days; chronological 70/30 split; any training target at or beyond the first holdout signal date is purged. Ridge(alpha=10), with News mean polarity, SEC mean polarity and two source-presence indicators, is fit only on earlier days. The historical *training-event-day* mean of next-session excess return is the no-text baseline. Compare held-out RMSE, MAE, and directional accuracy over nonzero-return dates. There is deliberately no optimization of thresholds or trading simulation. The 40-day threshold is an **engineering minimum**, not evidence of sufficient statistical power.
+
+**Result states:** `insufficient_evidence` (no validation conclusion, predictions header-only) or `held_out_experiment_not_trading_signal` (exploratory held-out scores, not proof of alpha). A lower RMSE versus the simple baseline is an initial incremental-information diagnostic only; it is **not** a statistically significant finding, a causal estimate, or financial advice.
+
+**Scope limitations:** A single chronological holdout is unstable; same-day aggregation does not remove adjacent-day dependence; date-only availability and SEC exhibits remain open; training and testing only on event-days creates conditional selection; QQQ contains the target issuers; Nasdaq Close/Last excludes dividend adjustments; and LM sentiment is not a measured market surprise. Future research should add a multi-period walk-forward benchmark using all market days, verified publication timestamps, and richer non-text baselines before any Buy/Hold/Sell claims.
+
+**Run with real data:** no extra command is required beyond the two commands already shown above. Do not confuse a passing synthetic CI test with successful local execution on genuine news, SEC, and Nasdaq files.
