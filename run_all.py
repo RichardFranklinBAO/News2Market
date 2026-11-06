@@ -4,8 +4,9 @@ Usage (from repository root):
     python run_all.py --ticker NVDA
 
 Requires official local LM dictionary and an identified SEC User-Agent.
-Uses yfinance adjusted historical closes when available; verified existing
-Nasdaq raw Close/Last CSVs are an explicitly labeled fallback.
+Uses keyless yfinance adjusted closes and hash-verified Yahoo pair cache;
+verified local Nasdaq raw Close/Last CSVs are the manual fallback.
+Stock-price API keys are not read in the current default workflow.
 """
 from __future__ import annotations
 
@@ -190,69 +191,90 @@ def import_nasdaq_pair(ticker: str, stock_csv: Path, qqq_csv: Path,
             for sym, v in validated.items()}
 
 
+class PriceUnavailableError(RuntimeError):
+    """No supported keyless stock/QQQ pair; display actionable setup in CLI."""
+
+
+def nasdaq_download_guide(ticker: str) -> str:
+    """Clear, current-ticker manual fallback without requiring Dashboard."""
+    from news2market.research.symbol_registry import canonical_symbol
+    ticker = canonical_symbol(ticker)
+    base = core.INPUTS / "prices"
+    stock_url = "https://www.nasdaq.com/market-activity/stocks/" + ticker.lower() + "/historical"
+    qqq_url = "https://www.nasdaq.com/market-activity/etf/qqq/historical"
+    return (
+        "\\n========== NASDAQ MANUAL PRICE FALLBACK ==========\\n"
+        "Automatic no-key Yahoo download failed (or no usable verified pair).\\n"
+        "1. Open these stock/ETF Nasdaq historical-price pages:\\n"
+        f"   {ticker}: {stock_url}\\n"
+        f"   QQQ: {qqq_url}\\n"
+        "   Download actual historical CSVs for BOTH; ideally 5 years.\\n"
+        "2. Put the two downloads in the project's lowercase inputs/prices folder:\\n"
+        f"   {base / (ticker + '.csv')}\\n"
+        f"   {base / 'QQQ.csv'}\\n"
+        "   Rename the files exactly as shown (uppercase ticker; CSV extension).\\n"
+        "   Required CSV columns: Date and Close/Last; original extras are fine.\\n"
+        "3. Once YOU have confirmed these are genuine Nasdaq downloads, run:\\n"
+        f"   python run_all.py --ticker {ticker} --prices nasdaq --confirm-nasdaq\\n"
+        "   This validates the files and creates SOURCE_MANIFEST.json automatically.\\n"
+        "   Do not manually create a manifest or claim unverified files are from Nasdaq.\\n"
+        "   If files are still in Downloads, use --stock-csv and --qqq-csv\\n"
+        "   with their actual paths plus --confirm-nasdaq instead.\\n"
+        "4. Later runs can simply use:\\n"
+        f"   python run_all.py --ticker {ticker} --prices nasdaq\\n"
+        "LIMITATION: Yahoo is unofficial and may throttle requests; Nasdaq downloads\\n"
+        "are a manual fallback. Raw Nasdaq Close/Last is not dividend-adjusted.\\n"
+        "===================================================\\n"
+    )
+
+
 def _prices(ticker: str, start: date, end: date, folder: Path, mode: str,
             log=print):
-    """Cache -> credentialed stable APIs -> Yahoo -> verified local Nasdaq.
+    """Keyless path only: recent Yahoo pair cache -> Yahoo -> verified Nasdaq.
 
-    One stock/QQQ pair always comes from one provider, with one price basis.
-    Never retry a rate-limited source in a loop.
+    No price API credentials are read, even when available in the environment.
+    All stock and QQQ prices in a run must share source and price basis.
     """
     from news2market.research import price_providers as providers
+    if mode not in ("auto", "yahoo", "nasdaq"):
+        raise ValueError("Supported no-key price modes: auto, yahoo, nasdaq")
     root = core.INPUTS / "cache" / "market_prices"
     errors = []
-    if mode in ("auto", "tiingo", "twelvedata", "yahoo"):
-        # Allow a fresh, hash-verified source-specific cache.
-        provider_name = {"tiingo": "tiingo_eod_adjusted",
-                         "twelvedata": "twelvedata_eod_adjusted",
-                         "yahoo": "yahoo_via_unofficial_yfinance"}.get(mode)
-        cached = providers.read_pair_cache(ticker, start, end, root,
-                                           provider=provider_name)
+    if mode in ("auto", "yahoo"):
+        cached = providers.read_pair_cache(
+            ticker, start, end, root,
+            provider="yahoo_via_unofficial_yfinance",
+        )
         if cached is not None:
-            log("Prices: verified local 24h adjusted-pair cache")
+            log("Prices: using hash-verified Yahoo stock/QQQ cache (no API key)")
             return cached
-    candidates = []
-    if mode == "auto":
-        if os.environ.get("TIINGO_API_KEY"):
-            candidates.append("tiingo")
-        if os.environ.get("TWELVEDATA_API_KEY"):
-            candidates.append("twelvedata")
-        candidates += ["yahoo", "nasdaq"]
-    else:
-        candidates = [mode]
 
+    candidates = (["yahoo", "nasdaq"] if mode == "auto" else [mode])
     for candidate in candidates:
         try:
-            if candidate == "tiingo":
-                rows, audit = providers.tiingo_pair(
-                    ticker, start, end, os.environ.get("TIINGO_API_KEY", ""))
-            elif candidate == "twelvedata":
-                rows, audit = providers.twelvedata_pair(
-                    ticker, start, end, os.environ.get("TWELVEDATA_API_KEY", ""))
-            elif candidate == "yahoo":
+            if candidate == "yahoo":
                 rows, audit = _price_rows_from_yahoo(ticker, start, end, folder)
-                # Yahoo CSV hashes already passed from its original downloader.
                 audit["requested_start"] = start.isoformat()
                 audit["requested_end"] = end.isoformat()
-            elif candidate == "nasdaq":
-                rows, audit = _price_rows_from_nasdaq(ticker)
-            else:
-                raise ValueError("Unsupported provider: " + candidate)
-            if candidate != "nasdaq":
                 providers.save_pair_cache(ticker, rows, audit, root)
-            audit["providers_attempted"] = [*errors, {"provider": candidate, "status": "used"}]
+            else:
+                rows, audit = _price_rows_from_nasdaq(ticker)
+            audit["providers_attempted"] = [
+                *errors, {"provider": candidate, "status": "used"}
+            ]
             log(f"Prices: using {audit['provider']} ({len(rows)} matched sessions)")
             return rows, audit
         except (RuntimeError, ValueError, KeyError, OSError, TypeError) as exc:
-            # No token or raw API URL may be copied into logs or reports.
             reason = str(exc)[:180]
             errors.append({"provider": candidate, "status": "unavailable",
                            "reason": reason})
             log(f"Price provider {candidate} unavailable: {reason}")
-    raise RuntimeError(
-        f"No source-verified stock/QQQ daily pair for {ticker}. "
-        + "; ".join(x["provider"] + ": " + x["reason"] for x in errors)
-        + ". For Nasdaq CSV: --prices nasdaq "
-        "--stock-csv /path/to/stock.csv --qqq-csv /path/to/QQQ.csv --confirm-nasdaq")
+
+    detail = "; ".join(x["provider"] + ": " + x["reason"] for x in errors)
+    raise PriceUnavailableError(
+        f"No usable keyless stock/QQQ price pair for {ticker}: {detail}.\\n"
+        + nasdaq_download_guide(ticker)
+    )
 
 
 def _news_rows(ticker: str, start: date, end: date, max_news: int, log=print):
@@ -335,6 +357,16 @@ def run(ticker="NVDA", start=None, end=None, news_days=90,
     if stock_csv:
         import_nasdaq_pair(ticker, Path(stock_csv), Path(qqq_csv),
                            confirmed_nasdaq=confirm_nasdaq)
+    elif confirm_nasdaq:
+        # Users may download/rename the files directly into canonical inputs.
+        # The explicit flag is their source attestation; verify both before
+        # registering their hashes. Never trust an unmanifested file silently.
+        import_nasdaq_pair(
+            ticker,
+            core.INPUTS / "prices" / (ticker + ".csv"),
+            core.INPUTS / "prices" / "QQQ.csv",
+            confirmed_nasdaq=True,
+        )
     out_root = Path(output_root) if output_root else core.RESULTS
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     folder = out_root / ticker / "Unified" / stamp
@@ -427,15 +459,15 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description="One-command News + SEC + LM + QQQ research",
         epilog=(
-            "Nasdaq CSV setup: download genuine stock + QQQ historical CSV files; "
-            "LEAVE them in Downloads, then run: "
-            "python run_all.py --ticker TSLA --prices nasdaq "
-            "--stock-csv ~/Downloads/HistoricalData_TSLA.csv "
-            "--qqq-csv ~/Downloads/HistoricalData_QQQ.csv --confirm-nasdaq. "
-            "The command validates and saves canonical files to "
-            "inputs/prices/TSLA.csv, inputs/prices/QQQ.csv and "
-            "SOURCE_MANIFEST.json. Later: python run_all.py --ticker TSLA --prices nasdaq. "
-            "Required columns: Date and Close/Last. Adjust filename paths to your actual downloads."
+            "No stock-price API key required: verified Yahoo cache -> Yahoo -> local Nasdaq. "
+            "If automatic prices fail, the Terminal prints Nasdaq download URLs and steps. "
+            "Download genuine stock and QQQ historical CSVs, then rename and place as "
+            "inputs/prices/<TICKER>.csv and inputs/prices/QQQ.csv. "
+            "Confirm origin and generate hashes using: "
+            "python run_all.py --ticker TSLA --prices nasdaq --confirm-nasdaq. "
+            "Required headers: Date, Close/Last. "
+            "Alternatively keep originals in Downloads and pass --stock-csv, "
+            "--qqq-csv and --confirm-nasdaq."
         ))
     parser.add_argument("--ticker", default=None, help="US stock symbol e.g. NVDA, MSFT, AMD, TSLA")
     parser.add_argument("--interactive", action="store_true", help="Prompt for a US stock ticker in Terminal")
@@ -444,9 +476,9 @@ def main(argv=None):
     parser.add_argument("--news-days", type=int, default=90)
     parser.add_argument("--max-news", type=int, default=15)
     parser.add_argument("--max-filings", type=int, default=50)
-    parser.add_argument("--prices", choices=["auto", "tiingo", "twelvedata", "yahoo", "nasdaq"],
+    parser.add_argument("--prices", choices=["auto", "yahoo", "nasdaq"],
                         default="auto",
-                        help="auto: 24h verified cache, Tiingo key, Twelve Data key, Yahoo, local Nasdaq")
+                        help="auto: verified no-key Yahoo cache -> Yahoo -> validated local Nasdaq")
     parser.add_argument("--stock-csv", type=Path,
                         help="Original Nasdaq stock CSV (may stay in ~/Downloads); imported to inputs/prices/<TICKER>.csv")
     parser.add_argument("--qqq-csv", type=Path,
@@ -463,12 +495,17 @@ def main(argv=None):
         print("News2Market — US Stock Research")
         print("Enter a real US stock ticker (examples: NVDA, AAPL, MSFT, AMD, TSLA)")
         args.ticker = input("Stock ticker: ").strip().upper()
-    result = run(ticker=args.ticker, start=args.start, end=args.end,
-                 news_days=args.news_days, max_news=args.max_news,
-                 max_filings=args.max_filings, prices=args.prices,
-                 agent=args.sec_user_agent, output_root=args.output_root,
-                 stock_csv=args.stock_csv, qqq_csv=args.qqq_csv,
-                 confirm_nasdaq=args.confirm_nasdaq)
+    try:
+        result = run(ticker=args.ticker, start=args.start, end=args.end,
+                     news_days=args.news_days, max_news=args.max_news,
+                     max_filings=args.max_filings, prices=args.prices,
+                     agent=args.sec_user_agent, output_root=args.output_root,
+                     stock_csv=args.stock_csv, qqq_csv=args.qqq_csv,
+                     confirm_nasdaq=args.confirm_nasdaq)
+    except PriceUnavailableError as exc:
+        import sys
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(2) from None
     print(json.dumps({
         "status": result["status"], "run_folder": result["folder"],
         "news": result["stages"].get("news", {}).get("records"),
