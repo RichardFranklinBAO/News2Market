@@ -153,6 +153,10 @@ def read_articles_csv(path):
     p=Path(path)
     if not p.is_file():raise FileNotFoundError(str(p))
     if p.stat().st_size > 50_000_000:raise ValueError("CSV exceeds 50 MB local research cap")
+    # SEC 10-Q/10-K body cells may exceed Python csv's ~128-KiB default.
+    # Increase the CSV parser's FIELD limit only; the existing per-file size
+    # ceiling and downstream 240K-character text-quality cap remain intact.
+    csv.field_size_limit(max(csv.field_size_limit(), 1_000_000))
     with p.open(encoding="utf-8-sig",newline="") as f:
         data=list(csv.DictReader(f))
     if not data:raise ValueError("CSV contains no article rows")
