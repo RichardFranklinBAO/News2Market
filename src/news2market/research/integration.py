@@ -79,8 +79,8 @@ def align_features_with_prices(feature_rows, price_rows, ticker, min_directional
     are measured from that later close. SEC public availability is unverified.
     """
     ticker = str(ticker).upper()
-    if ticker not in ("NVDA", "AAPL", "GOOGL"):
-        raise ValueError("Ticker must be NVDA, AAPL or GOOGL")
+    from .symbol_registry import canonical_symbol
+    ticker = canonical_symbol(ticker)
     if min_directional_hits < 1:
         raise ValueError("Minimum hit count must be positive")
     days = {}
@@ -192,6 +192,9 @@ def run_market_integration(ticker, features_csv, output_folder, *,
         raise ValueError("No feature records found")
     if price_rows is None:
         # Legacy research market CLI: explicitly verified user-imported Nasdaq pair.
+        from news2market.core import COMPANIES
+        if ticker not in COMPANIES:
+            raise ValueError("Legacy Nasdaq market command requires registered ticker; use run_all.py")
         state = price_status(ticker)
         if not state["ready"]:
             raise ValueError("Import verified Nasdaq " + ticker + " and QQQ CSVs in the dashboard first")
