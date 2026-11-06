@@ -22,6 +22,24 @@ News2Market is an independent Python research prototype. It collects company-rel
 
 This demonstrates **research data engineering and text-measurement integrity**, not validated market forecasting or causal identification.
 
+## One-command unified workflow (v0.3)
+
+From the project root, install dependencies and provide a genuine SEC User-Agent:
+
+```bash
+python -m pip install -r requirements.txt
+export N2M_SEC_USER_AGENT="Your Real Name your-real-email@example.com"
+python run_all.py --ticker NVDA
+```
+
+This runs News collection, SEC document retrieval, unified LM measurement,
+automatic adjusted historical stock/QQQ price download via unofficial
+`yfinance` (fallback to previously hash-verified local Nasdaq CSVs), and
+exploratory market validation **without dashboard clicks or manual run-folder
+selection**. The official LM dictionary is still required locally and is not
+redistributed. See [complete one-command instructions](docs/ONE_COMMAND_WORKFLOW.md).
+Existing Workflow A and Workflow B commands remain available.
+
 ## Quick Start
 
 **Choose one of two independent workflows** (both use the official LM dictionary):
