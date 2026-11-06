@@ -203,28 +203,28 @@ def nasdaq_download_guide(ticker: str) -> str:
     stock_url = "https://www.nasdaq.com/market-activity/stocks/" + ticker.lower() + "/historical"
     qqq_url = "https://www.nasdaq.com/market-activity/etf/qqq/historical"
     return (
-        "\\n========== NASDAQ MANUAL PRICE FALLBACK ==========\\n"
-        "Automatic no-key Yahoo download failed (or no usable verified pair).\\n"
-        "1. Open these stock/ETF Nasdaq historical-price pages:\\n"
-        f"   {ticker}: {stock_url}\\n"
-        f"   QQQ: {qqq_url}\\n"
-        "   Download actual historical CSVs for BOTH; ideally 5 years.\\n"
-        "2. Put the two downloads in the project's lowercase inputs/prices folder:\\n"
-        f"   {base / (ticker + '.csv')}\\n"
-        f"   {base / 'QQQ.csv'}\\n"
-        "   Rename the files exactly as shown (uppercase ticker; CSV extension).\\n"
-        "   Required CSV columns: Date and Close/Last; original extras are fine.\\n"
-        "3. Once YOU have confirmed these are genuine Nasdaq downloads, run:\\n"
-        f"   python run_all.py --ticker {ticker} --prices nasdaq --confirm-nasdaq\\n"
-        "   This validates the files and creates SOURCE_MANIFEST.json automatically.\\n"
-        "   Do not manually create a manifest or claim unverified files are from Nasdaq.\\n"
-        "   If files are still in Downloads, use --stock-csv and --qqq-csv\\n"
-        "   with their actual paths plus --confirm-nasdaq instead.\\n"
-        "4. Later runs can simply use:\\n"
-        f"   python run_all.py --ticker {ticker} --prices nasdaq\\n"
-        "LIMITATION: Yahoo is unofficial and may throttle requests; Nasdaq downloads\\n"
-        "are a manual fallback. Raw Nasdaq Close/Last is not dividend-adjusted.\\n"
-        "===================================================\\n"
+        "\n========== NASDAQ MANUAL PRICE FALLBACK ==========\n"
+        "Automatic no-key Yahoo download failed (or no usable verified pair).\n"
+        "1. Open these stock/ETF Nasdaq historical-price pages:\n"
+        f"   {ticker}: {stock_url}\n"
+        f"   QQQ: {qqq_url}\n"
+        "   Download actual historical CSVs for BOTH; ideally 5 years.\n"
+        "2. Put the two downloads in the project's lowercase inputs/prices folder:\n"
+        f"   {base / (ticker + '.csv')}\n"
+        f"   {base / 'QQQ.csv'}\n"
+        "   Rename the files exactly as shown (uppercase ticker; CSV extension).\n"
+        "   Required CSV columns: Date and Close/Last; original extras are fine.\n"
+        "3. Once YOU have confirmed these are genuine Nasdaq downloads, run:\n"
+        f"   python run_all.py --ticker {ticker} --prices nasdaq --confirm-nasdaq\n"
+        "   This validates the files and creates SOURCE_MANIFEST.json automatically.\n"
+        "   Do not manually create a manifest or claim unverified files are from Nasdaq.\n"
+        "   If files are still in Downloads, use --stock-csv and --qqq-csv\n"
+        "   with their actual paths plus --confirm-nasdaq instead.\n"
+        "4. Later runs can simply use:\n"
+        f"   python run_all.py --ticker {ticker} --prices nasdaq\n"
+        "LIMITATION: Yahoo is unofficial and may throttle requests; Nasdaq downloads\n"
+        "are a manual fallback. Raw Nasdaq Close/Last is not dividend-adjusted.\n"
+        "===================================================\n"
     )
 
 
@@ -272,7 +272,7 @@ def _prices(ticker: str, start: date, end: date, folder: Path, mode: str,
 
     detail = "; ".join(x["provider"] + ": " + x["reason"] for x in errors)
     raise PriceUnavailableError(
-        f"No usable keyless stock/QQQ price pair for {ticker}: {detail}.\\n"
+        f"No usable keyless stock/QQQ price pair for {ticker}: {detail}.\n"
         + nasdaq_download_guide(ticker)
     )
 
