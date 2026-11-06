@@ -111,10 +111,22 @@ def _price_rows_from_nasdaq(ticker: str):
         if sym in core.NAS_PRICE_LINKS:
             core._reuse_previous_project_csv(sym, log=lambda _: None)
         path = core.INPUTS / "prices" / (sym + ".csv")
-        if not path.is_file() or not core._nasdaq_evidence(sym, path):
+        if not path.is_file():
             raise RuntimeError(
-                f"Missing verified local Nasdaq file for {sym}: "
-                "import via --stock-csv and --qqq-csv with --confirm-nasdaq")
+                f"{sym}.csv NOT FOUND at {path}. Download a genuine Nasdaq CSV "
+                "and save it under inputs/prices/ or import via --stock-csv and --qqq-csv.")
+        if not core._nasdaq_evidence(sym, path):
+            entry = core._nasdaq_manifest().get(sym)
+            if not isinstance(entry, dict):
+                why = "file exists but symbol has no entry in SOURCE_MANIFEST.json"
+            elif "nasdaq" not in str(entry.get("source", "")).lower():
+                why = "manifest has no user-confirmed Nasdaq source for this symbol"
+            else:
+                why = "file hash does not match SOURCE_MANIFEST.json (file may have changed)"
+            raise RuntimeError(
+                f"{sym}.csv FOUND at {path}, but NOT REGISTERED/VERIFIED: {why}. "
+                f"If both {ticker}.csv and QQQ.csv are genuine Nasdaq exports, "
+                f"run: python run_all.py --ticker {ticker} --prices nasdaq --confirm-nasdaq")
     asset, _ = core._read_price_csv(core.INPUTS / "prices" / (ticker + ".csv"), ticker)
     qqq, _ = core._read_price_csv(core.INPUTS / "prices" / "QQQ.csv", "QQQ")
     overlap = sorted(set(asset) & set(qqq))
@@ -361,12 +373,15 @@ def run(ticker="NVDA", start=None, end=None, news_days=90,
         # Users may download/rename the files directly into canonical inputs.
         # The explicit flag is their source attestation; verify both before
         # registering their hashes. Never trust an unmanifested file silently.
-        import_nasdaq_pair(
+        registered = import_nasdaq_pair(
             ticker,
             core.INPUTS / "prices" / (ticker + ".csv"),
             core.INPUTS / "prices" / "QQQ.csv",
             confirmed_nasdaq=True,
         )
+        log("Nasdaq source confirmed and registered: "
+            + ", ".join(f"{sym} ({info['rows']} rows)" for sym, info in registered.items()))
+        log("Manifest updated: " + str(core.INPUTS / "prices" / "SOURCE_MANIFEST.json"))
     out_root = Path(output_root) if output_root else core.RESULTS
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     folder = out_root / ticker / "Unified" / stamp
