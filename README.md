@@ -22,70 +22,75 @@ News2Market is an independent Python research prototype. It collects company-rel
 
 This demonstrates **research data engineering and text-measurement integrity**, not validated market forecasting or causal identification.
 
-## Fully automatic historical stock prices (v0.4)
+## Keyless historical stock prices (default; current implementation)
 
-**No manual CSV needed when a working market-data API is configured.** The same
-interactive `python run_all.py` automatically attempts a SHA256-checked local
-cache, then a configured **Tiingo** API, a configured **Twelve Data** API,
-unofficial Yahoo Finance, and finally an already user-confirmed local Nasdaq
-pair. Failed providers do not silently supply synthetic prices or mixed
-stock-versus-QQQ price adjustment bases.
+**No stock-price API key or market-data registration is required.** From the
+project folder, run `python run_all.py` and type a U.S. stock ticker.
+After SEC issuer verification, the market-data stage uses:
 
-One-time setup (use either market-data provider's account/API key):
+1. A recent, hash-checked **Yahoo adjusted-price cache** (stock + QQQ).
+2. A direct **yfinance/Yahoo historical daily download**, with no API key.
+3. An already verified, user-confirmed **Nasdaq stock + QQQ CSV pair**.
 
-```bash
-cd ~/Downloads/News2Market-main
-python -m pip install -r requirements.txt
-export N2M_SEC_USER_AGENT="Your Real Name your-real-email@example.com"
-export TIINGO_API_KEY="YOUR_PRIVATE_TIINGO_TOKEN"
-# Alternatively: export TWELVEDATA_API_KEY="YOUR_PRIVATE_TWELVE_DATA_KEY"
-python run_all.py
+Yahoo is unofficial, may impose rate limits, and cannot guarantee availability.
+**If no usable price pair is available, the Terminal clearly displays the exact
+Nasdaq historical download URLs for that ticker and QQQ, how to rename both
+CSV files, and the command to confirm their source.** It stops before collecting
+news and SEC; there is no fabricated price or silent fallback to unrelated data.
+
+The one-time manual fallback is:
+
+```text
+Download historical CSVs from the Nasdaq stock and QQQ pages.
+Put them in News2Market-main/inputs/prices/ exactly as:
+  <TICKER>.csv     e.g. TSLA.csv
+  QQQ.csv
 ```
 
-The program prompts for a current US exchange-listed stock ticker and collects
-the paired stock/QQQ adjusted close series automatically. **Never commit API
-tokens**; they are read from environment variables. If all API attempts fail,
-manual Nasdaq imports remain a last resort. Historical news full-body coverage
-and independent forward-return inference remain separate limitations.
-
-See [automatic API/provider setup and limitations](docs/ONE_COMMAND_WORKFLOW.md).
-
-## Start here: where to put downloaded Nasdaq CSVs
-
-**Easiest method: leave the original Nasdaq files in `~/Downloads/`.** You do not need to rename or move them yourself. For a TSLA study, download **both TSLA and QQQ** historical CSVs directly from Nasdaq, then run from the project folder:
+Then explicitly confirm their genuine Nasdaq origin and run the complete pipeline:
 
 ```bash
-cd ~/Downloads/News2Market-main
-export N2M_SEC_USER_AGENT="Your Real Name your-real-email@example.com"
-python run_all.py --ticker TSLA --prices nasdaq \
-  --stock-csv "$HOME/Downloads/HistoricalData_TSLA.csv" \
-  --qqq-csv "$HOME/Downloads/HistoricalData_QQQ.csv" \
-  --confirm-nasdaq
+python run_all.py --ticker TSLA --prices nasdaq --confirm-nasdaq
 ```
 
-Replace the filenames above with your **actual downloaded filenames** (case matters). The files must be genuine Nasdaq exports; `--confirm-nasdaq` records your attestation of their source. This command verifies and **automatically copies** them into the project:
+The program validates the CSV content and creates
+`inputs/prices/SOURCE_MANIFEST.json` (ticker attribution and SHA256 hashes).
+The original CSV should contain `Date` and `Close/Last` columns.
+**Do not manually create the manifest or upload private API keys.**
+Alternatively, supply original download paths with `--stock-csv`,
+`--qqq-csv`, and `--confirm-nasdaq` without moving or renaming them.
+See [the exact manual fallback and limitations](docs/ONE_COMMAND_WORKFLOW.md).
+
+**Limitation / future work:** This free keyless approach is subject to unofficial
+Yahoo throttling, data availability and changes to its endpoint. It is not a
+commercial reliability guarantee. It may require one-time manual Nasdaq
+downloads when Yahoo fails. A future **opt-in personal API key** provider
+(Tiingo, Twelve Data or similar) may be supported again, with distinct
+provenance and licensing checks. The **current default CLI does not use
+`TIINGO_API_KEY` or `TWELVEDATA_API_KEY`**.
+
+## Manual Nasdaq backup: exact location and naming
+
+If the Terminal tells you no verified price pair is available, use the
+**URLs printed in the error** (for example TSLA stock and QQQ ETF historical
+pages). Download the genuine Nasdaq historical CSV for each and place them
+in the project's **lowercase** `inputs/prices/` folder:
 
 ```text
 News2Market-main/
   inputs/
-    Loughran-McDonald_MasterDictionary_1993-2025.csv
     prices/
       TSLA.csv
       QQQ.csv
-      SOURCE_MANIFEST.json
 ```
 
-**For later runs of the same ticker:** if the verified CSVs are already in `inputs/prices/`, just run:
-
-```bash
-python run_all.py --ticker TSLA --prices nasdaq
-```
-
-The project **requires the generated `SOURCE_MANIFEST.json`** to verify local CSV hashes and the selected ticker. Merely copying/renaming a CSV into `inputs/prices/` without using the import command is **not sufficient**.
-
-**Required Nasdaq CSV headers:** `Date` and `Close/Last`. `MM/DD/YYYY` or `YYYY-MM-DD` dates; price values such as `$245.50`. Columns such as `Volume`, `Open`, `High`, `Low` may remain. At least 3 unique valid dates are required; for meaningful analysis, get a multi-year history including future close dates after the text events. CSV contents alone do not certify the ticker; your explicit import assigns it. Raw Nasdaq prices are not dividend-adjusted.
-
-**Alternative:** `python run_all.py --ticker TSLA --prices auto` tries unofficial Yahoo Finance adjusted closes and falls back to an *already verified* local Nasdaq pair. If Yahoo is rate-limited and you have not imported TSLA + QQQ, the runner stops and explains the missing files. See [full guide](docs/ONE_COMMAND_WORKFLOW.md).
+Name files exactly `<UPPERCASE_TICKER>.csv` and `QQQ.csv`.
+Run `python run_all.py --ticker TSLA --prices nasdaq --confirm-nasdaq`
+once to verify both and generate `SOURCE_MANIFEST.json`, then future runs
+only need `python run_all.py --ticker TSLA --prices nasdaq`.
+The `--confirm-nasdaq` flag is an honest user attestation, not proof
+embedded in the price CSV. Original CSV fields must include `Date`
+and `Close/Last`; additional Nasdaq columns are fine.
 
 ## One-command unified workflow (v0.3)
 
@@ -107,7 +112,7 @@ and `--qqq-csv` import flags. The legacy dashboard remains limited to three
 companies.
 
 This runs News collection, SEC document retrieval, unified LM measurement,
-automatic adjusted historical stock/QQQ price download via unofficial
+automatic keyless adjusted historical stock/QQQ price download via unofficial
 `yfinance` (fallback to previously hash-verified local Nasdaq CSVs), and
 exploratory market validation **without dashboard clicks or manual run-folder
 selection**. The official LM dictionary is still required locally and is not
