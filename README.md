@@ -1,86 +1,65 @@
 # News2Market
 
-**An auditable Financial NLP & Empirical Research Pipeline.**
+**Financial NLP · Alternative Data · Empirical Research**
 
-News2Market integrates U.S. company news (Workflow A), SEC EDGAR disclosures (Workflow B), Loughran–McDonald (LM) financial text measures, and subsequent stock-versus-QQQ returns in one Python workflow.
+## 1. Project Overview
 
-**Status: Phase I engineering prototype completed (November 2026).** The pipeline has been run on real NVDA, TSLA and AMD data. It does **not** establish predictive power, abnormal returns, causality or a profitable trading strategy.
+News2Market is an independent, reproducible Python research prototype exploring a question in empirical finance: **Can public company news and SEC disclosures be transformed into reliable textual measures and related to subsequent stock-market outcomes?**
 
-## What is implemented
+It integrates **company news (Workflow A)** and **SEC EDGAR filings (Workflow B)**, applies the Loughran–McDonald (LM) financial dictionary, and aligns measured text with **1-, 3-, and 5-trading-session stock returns relative to QQQ**. News and SEC remain distinguishable sources; identity, text quality, data provenance and exclusions are audited rather than silently discarded.
 
-- **Data collection:** U.S. stock ticker/SEC CIK lookup, news discovery and full-text extraction, selected SEC 8-K/10-Q/10-K primary-document retrieval.
-- **Financial NLP:** source-aware text cleaning, completeness and identity checks, LM dictionary word counts/polarity, and descriptive TF-IDF.
-- **Empirical alignment:** matched stock/QQQ daily prices, 1/3/5-session relative price returns, and source-specific News/SEC features.
-- **Research safeguards:** exclusion and provenance audits, same-day event aggregation, and a conditional chronological holdout that returns `insufficient_evidence` when samples are inadequate.
+**Phase I (November 2026): implemented and exercised on real NVDA, TSLA and AMD data.** This is an exploratory research pipeline, **not** a demonstrated return-prediction or trading system.
 
-### Pre-doctoral research skills demonstrated
+**Run locally** (Python 3.11–3.12; [setup details](docs/ONE_COMMAND_WORKFLOW.md)):
 
-Built as a technical work sample for **Economics/Finance Predoc RA roles, including Northwestern**. The project demonstrates several responsibilities highlighted in such positions:
+```bash
+python -m pip install -r requirements.txt
+# Install the official LM dictionary in inputs/ (see linked setup guide).
+export N2M_SEC_USER_AGENT="Your Real Name your-email@example.com"
+python run_all.py                       # Choose a U.S. stock ticker in Terminal
+# Or: python run_all.py --ticker AMD
+```
 
-| Research responsibility | Evidence in News2Market |
+Market prices use a **keyless Yahoo/cache path** with a user-verified Nasdaq CSV fallback. If automatic access fails, the program displays ticker-specific download links and file instructions. Complete outputs and audits are saved under `Results/<TICKER>/Unified/<RUN_ID>/`.
+
+## 2. Research and Technical Skills Demonstrated
+
+| Skill | Evidence in this project |
 |---|---|
-| **Statistical analysis in Python** | Event-to-market return alignment, day-level aggregation and an exploratory NVDA OLS/HC1 analysis; results and non-findings reported transparently. |
-| **Web scraping and alternative data** | Automated discovery/extraction of company news alongside official SEC EDGAR filings, with issuer and source checks. |
-| **Creating research datasets from text** | Parsed, deduplicated, quality-screened News/SEC records joined to historical stock/QQQ outcomes, with reproducible audit trails. |
-| **Python-based NLP and machine learning** | LM sentiment features and descriptive TF-IDF; a source-aware Ridge holdout *implemented but not fitted* because the live sample failed the minimum-data gate. |
-| **Writing research results** | An English [Research Note](docs/RESEARCH_NOTE_PHASE_I.md), methodological documentation, and explicit limitations/negative findings. |
+| **Web scraping and alternative-data collection** | Automated company-news discovery and article extraction; official SEC EDGAR filing retrieval; ticker/CIK and source verification. |
+| **Research dataset construction** | Parsing, deduplication, source labeling, missingness/completeness checks, document hashes, and joining News/SEC features to stock–QQQ market outcomes. |
+| **Python NLP and text measurement** | LM financial-word counts and sentiment polarity, descriptive TF-IDF, source-specific text features, and safeguards against low-information or truncated documents. |
+| **Statistical and computational analysis** | Event-date/return alignment, 1/3/5-session relative-return calculations, daily aggregation to reduce pseudo-replication, and a separate exploratory NVDA OLS analysis with HC1 standard errors. |
+| **Research design and communication** | An implemented chronological Ridge-versus-no-text validation **protocol** (not fitted on the insufficient live samples), transparent negative results, auditable reports, and an English [Research Note](docs/RESEARCH_NOTE_PHASE_I.md). |
 
-**Scope:** This work does **not** claim OCR, randomized experiments, formal literature reviews, structural/dynamic economic modeling, or validated predictive performance. Those are distinct research skills, not completed components of this project.
+These are demonstrated components of this project—not claims to have implemented OCR, randomized experiments, structural economic models, or a fully trained predictive ML system.
 
-### NLP research roadmap
+## 3. Project Results
 
-| Layer | Research goal | Phase I status |
-|---|---|---|
-| **1. Lexical measurement** | Quantify finance-related language with a transparent LM dictionary | **Implemented** |
-| **2. Contextual semantics** | Interpret negation, comparisons, sentence meaning and document context (e.g., FinBERT or carefully evaluated LLMs) | **Future work** |
-| **3. Economic information & expectations** | Separate absolute sentiment from **surprises relative to prior market expectations**, using expectations and realized outcomes | **Future work** |
+**Observed local end-to-end runs — November 6, 2026**
 
-An earlier optional local LLM-labeling experiment is not a validated implementation of Layers 2–3.
-
-## Observed results
-
-User-executed local unified runs, **November 6, 2026**:
-
-| Stock | Eligible news bodies | SEC filings selected | Market-aligned events | Informative distinct days |
+| Stock | Eligible news full texts | SEC filings selected | Market-aligned events | Informative independent signal days |
 |---|---:|---:|---:|---:|
 | NVDA | 8 | 4 | 11 | 5 |
 | TSLA | 0 | 4 | 3 | 1 |
 | AMD | 0 | 5 | 3 | 2 |
 
-All three completed the engineering workflow, but each returned **`insufficient_evidence`** for holdout validation. Only the NVDA run contained both eligible News and SEC texts; TSLA and AMD yielded SEC-only aligned events. **A+B are integrated in software, not yet proven complementary in an empirical model.** Counts refer to separate runs, not a pooled research sample.
+- **Engineering milestone:** All three companies completed the collection/measurement/market-alignment pipeline. AMD was aligned against **1,253** matching stock–QQQ trading sessions.
+- **Actual A+B integration:** NVDA yielded both eligible News and SEC observations; the TSLA and AMD aligned samples were **SEC-only** because no qualified news full texts were found.
+- **Statistical result:** Every unified run reported `insufficient_evidence`; **no out-of-sample forecasting model was fitted** and no predictive advantage was established.
+- **Separate earlier NVDA pilot:** 18 dated issuer-news signal sessions; LM polarity versus next-session QQQ-relative return had Pearson *r* = −0.0353 and exploratory HC1 *p* ≈ 0.8602 (**no evidence of a simple linear association**). This is a different sample and is not pooled with the unified runs.
 
-A separate historical NVDA issuer-news pilot (18 signal sessions) found no simple linear return association (*r* = −0.0353; exploratory HC1 *p* ≈ 0.8602). See the **[Phase I Research Note](docs/RESEARCH_NOTE_PHASE_I.md)** for scope, methods, and evidence.
+The [Phase I Research Note](docs/RESEARCH_NOTE_PHASE_I.md) documents methods, interpretation and source limitations. Detailed [SEC collection audits](docs/SEC_REAL_DATA_VALIDATION_2026-11-06.md) and [market-alignment methodology](docs/INTEGRATED_MARKET_RESEARCH.md) are also available.
 
-## Quick start
+## 4. Limitations and Future Directions
 
-Python 3.11–3.12 recommended. Install dependencies and the [official LM dictionary](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) at `inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv`. SEC access requires a genuine contact User-Agent.
+1. **News coverage and representativeness.** RSS timeouts, inaccessible articles and incomplete historical archives produced **zero qualified news bodies for TSLA/AMD**; multiple years of price data cannot repair sparse text data. *Next:* authorized historical news sources, broader issuer coverage and explicit missingness/selection analysis.
+2. **Incomplete SEC disclosures.** Only selected recent primary 8-K/10-Q/10-K documents are retrieved; lengthy filings can be truncated and **8-K exhibits are not comprehensively included**. *Next:* verified exhibit collection and section-aware extraction.
+3. **NLP Layer 1 — lexical measurement, not contextual understanding.** LM word balance may miss negation, comparisons and domain-specific meaning (e.g., “losses narrowed”). *Next, Layer 2:* evaluate contextual models such as FinBERT or constrained LLM-based information extraction against independently checked labels; **this semantic capability has not been validated**.
+4. **NLP Layer 3 — economic surprise and expectations.** Even correctly identifying positive language does not show whether disclosed information was **better or worse than prior market expectations**. *Next:* link text to analyst forecasts, prior management guidance, realized fundamentals and measures of unexpected information. This economic-expectations layer is **not yet implemented**.
+5. **Market timing and inference.** Document calendar dates do not verify first public availability; stock-minus-QQQ price returns are **not causal effects or factor-adjusted alpha**, and QQQ contains the firms studied. Nasdaq raw `Close/Last` and Yahoo adjusted closes have different price bases. The observed 5/1/2 informative dates are below the provisional **40-day engineering gate**, which itself is not proof of statistical power. *Next:* verified timestamps, larger independent samples, News-only/SEC-only/combined ablations, stronger risk-adjusted benchmarks and walk-forward evaluation.
+6. **Price access and reproducibility.** Unofficial keyless Yahoo data may be rate-limited; the manual Nasdaq fallback requires genuine user-attributed CSVs. *Next:* consider an **optional personal API key** provider after reviewing coverage, licensing and provenance. Third-party article text, market prices and the LM dictionary are not redistributed.
 
-```bash
-python -m pip install -r requirements.txt
-export N2M_SEC_USER_AGENT="Your Real Name your-email@example.com"
-python run_all.py                  # Interactive U.S. stock selection
-# Alternatively: python run_all.py --ticker AMD
-```
+**Research status:** Phase I demonstrates financial-data engineering, NLP measurement and reproducible exploratory analysis. **Validated economic mechanisms, incremental predictive value and a profitable trading strategy remain open research questions.**
 
-**No market-price API key needed.** Price retrieval tries a verified Yahoo cache, unofficial keyless `yfinance`, then a previously registered Nasdaq stock/QQQ CSV pair. If both fail, the Terminal prints relevant Nasdaq download links and setup steps.
-
-For genuine Nasdaq historical exports, rename and place files in `inputs/prices/AMD.csv` and `inputs/prices/QQQ.csv` (replace AMD with your ticker), then register their user-attested source and hashes:
-
-```bash
-python run_all.py --ticker AMD --prices nasdaq --confirm-nasdaq
-```
-
-Files must contain `Date` and `Close/Last`. An alternative import directly from Downloads is documented in the [one-command setup guide](docs/ONE_COMMAND_WORKFLOW.md). Run results and audits are stored under `Results/<TICKER>/Unified/<RUN_ID>/`.
-
-## Limitations & future directions
-
-1. **Incomplete historical text coverage.** RSS timeouts, publisher restrictions and limited archives yield sparse and nonrandom news coverage (zero eligible news bodies for TSLA/AMD). **Next:** authorized historical archives, improved multi-firm retrieval, coverage and missingness audits.
-2. **Incomplete SEC event content.** Only selected recent primary filings are collected; some long documents are truncated and **8-K exhibits are not systematically retrieved**. **Next:** section-aware extraction and exhibit capture with quality controls.
-3. **Lexicon is not semantic understanding.** LM scores count dictionary terms but may misinterpret negation, comparisons and context (e.g., “losses narrowed”). **Next — NLP Layer 2:** validate contextual models such as FinBERT or LLM-based event interpretation against independently checked labels. No semantic accuracy is claimed yet.
-4. **Sentiment is not economic surprise.** Even an accurate positive/negative interpretation cannot establish whether results exceed **prior investor or analyst expectations**. **Next — NLP Layer 3:** link disclosures to prior guidance/forecasts, realized fundamentals and market expectations; distinguish anticipated information from unexpected news.
-5. **Timing, benchmark and statistical limits.** Public availability timestamps remain unverified; date-based alignment is **not a causal event study**. Stock-minus-QQQ returns are not factor-adjusted alpha, and raw Nasdaq `Close/Last` differs from Yahoo adjusted prices. With only 5/1/2 informative days, the provisional 40-day engineering minimum is unmet; **no out-of-sample prediction model was fitted**. **Next:** larger independent samples, pre-specified hypotheses, source ablations (News-only, SEC-only, combined), adjusted risk benchmarks and walk-forward evaluation.
-6. **Operational reliability and data rights.** The default keyless Yahoo feed can rate-limit; manual Nasdaq downloads may be needed. **Next:** consider *optional* personal API-key providers subject to licensing/provenance review. Third-party prices, news bodies and the LM dictionary are not redistributed.
-
-**Documentation:** [Research Note](docs/RESEARCH_NOTE_PHASE_I.md) · [Setup](docs/ONE_COMMAND_WORKFLOW.md) · [Market methodology](docs/INTEGRATED_MARKET_RESEARCH.md) · [NVDA pilot](docs/RESEARCH_REPORT.md) · [SEC audit](docs/SEC_REAL_DATA_VALIDATION_2026-11-06.md)
-
-*Independent exploratory research prototype. Not investment advice. No software reuse license is currently granted.*
+*Independent exploratory research prototype; not investment advice. No software reuse license is currently granted.*
