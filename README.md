@@ -33,6 +33,8 @@ This demonstrates **research data engineering and text-measurement integrity**, 
 
 **[Detailed Mac walkthrough for both workflows](docs/TWO_WORKFLOWS.md)** — including exact commands, result locations, and what constitutes a successful check.
 
+**Optional integrated assessment:** Quality-screened News + SEC LM feature records can now be aligned with manually imported Nasdaq stock/QQQ CSVs. The analysis reports **lexical bullish/bearish tendency or insufficient evidence** and *subsequent* 1/3/5-session QQQ-relative returns; **it is not a Buy/Sell signal, verified event study, or trading recommendation**. See [Integrated News–SEC–Market Analysis](docs/INTEGRATED_MARKET_RESEARCH.md).
+
 Python **3.11–3.12** recommended. Install from a fresh clone:
 
 ~~~bash

@@ -245,6 +245,30 @@ def command_benchmark(args):
         raise
 
 
+def command_market(args):
+    """Join independently measured news/SEC LM features with verified Nasdaq/QQQ prices.
+
+    This returns descriptive textual tone and later relative market outcomes, not
+    trading instructions, a calibrated return forecast, or causal identification.
+    """
+    ticker,_=_company(args.ticker)
+    folder=run_folder(ticker,args.output_root)
+    try:
+        from .integration import run_market_integration
+        summary=run_market_integration(ticker,args.features_csv,folder,
+            min_directional_hits=args.min_directional_hits)
+        audit={'status':'descriptive_only','ticker':ticker,'aligned_events':summary['aligned_events'],
+               'market_assessment':summary,
+               'limitations':['Textual tone is not a Buy/Sell order or a validated prediction',
+                              'Market time of first information availability is not verified']}
+        write_json(folder/'research_audit.json',audit)
+        return folder,audit
+    except Exception as exc:
+        write_json(folder/'research_audit.json',{'status':'failed',
+            'error':f'{type(exc).__name__}: {str(exc)[:400]}'})
+        raise
+
+
 def main(argv=None):
     p=argparse.ArgumentParser(prog='python -m news2market research',
         description='Auditable SEC filings, LM/TF-IDF features and held-out independent-label checks')
@@ -272,14 +296,23 @@ def main(argv=None):
     b.add_argument('--labels-csv',required=True)
     b.add_argument('--dictionary',type=Path,default=LM_PATH)
     b.add_argument('--output-root',type=Path,default=None)
+    joint=sub.add_parser('market',help='Align quality-screened SEC/news LM features with QQQ-relative returns (descriptive only)')
+    joint.add_argument('--ticker',required=True,choices=['NVDA','AAPL','GOOGL'])
+    joint.add_argument('--features-csv',required=True,type=Path,help='research_features.csv from a previous combined SEC/news measurement run')
+    joint.add_argument('--min-directional-hits',type=int,default=3,
+        help='Unvalidated diagnostic: below this many LM polarity hits, do not assign textual tone')
+    joint.add_argument('--output-root',type=Path,default=None)
     args=p.parse_args(argv)
     try:
-        folder,audit={'sec':command_sec,'measure':command_measure,'benchmark':command_benchmark}[args.action](args)
+        folder,audit={'sec':command_sec,'measure':command_measure,'benchmark':command_benchmark,
+                      'market':command_market}[args.action](args)
     except (ValueError,FileNotFoundError,EvaluationNotSupported,sec.SecAccessError) as e:
         p.exit(2,f'Research command stopped: {e}\nCheck Results/<TICKER>/Research for a failure audit; no synthetic findings are generated.\n')
     print(json.dumps({'run_folder':str(folder),'status':audit['status'],
                       'filings':audit.get('disclosures_selected'),
-                      'feature_records':audit.get('outputs',{}).get('output_records')},indent=2))
+                      'feature_records':(audit.get('outputs',{}).get('output_records')
+                          or audit.get('research_scores',{}).get('output_records')),
+                      'aligned_events':audit.get('aligned_events')},indent=2))
     return audit
 
 if __name__=='__main__':main()

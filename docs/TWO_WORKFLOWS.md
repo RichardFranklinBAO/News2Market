@@ -91,6 +91,10 @@ Look for `research_report.json`, `news_audit.json`, `news_summary.csv`, `05_lm_l
 
 **Caveats:** The 1.5 MB response cap and 240,000-character text cap can exclude long filings; truncated documents are not scored as complete text. The current implementation focuses on primary documents and does not systematically retrieve exhibits. SEC acceptance time does not establish the first public market-available instant. For the verified three-company 15-filing pilot, see [SEC Real-Data Validation](SEC_REAL_DATA_VALIDATION_2026-11-06.md).
 
+## Optional combined News + SEC + QQQ assessment
+
+Both workflows can feed an additional descriptive market-alignment command. See [Integrated News–SEC–Market Analysis](INTEGRATED_MARKET_RESEARCH.md). This is not a validated stock-trading signal and does not require Ollama.
+
 ## Optional Qwen labels
 
 Ollama is a local model-serving runtime. To experiment with optional economic event annotation, [install Ollama](https://ollama.com/download), run `ollama pull qwen2.5:1.5b`, and enable **Local LLM** in the dashboard. These labels are not independently human-validated.
