@@ -37,11 +37,9 @@ python run_all.py --ticker NVDA --start 2026-01-01 --end 2026-11-06 \
   --max-news 15 --max-filings 50 --prices auto
 ```
 
-- `--prices auto` (default): try adjusted historical Yahoo daily data via the
-  unofficial `yfinance` library, then fall back to **previously user-verified**
-  Nasdaq CSVs; failure of both is an explicit error. When Yahoo data are stale
-  by more than ten calendar days, the automatic mode prefers the fallback
-  rather than pretending that downloaded prices are current.
+- `--prices auto` (default): verified local adjusted-price cache, then Tiingo
+  (with key), Twelve Data (with key), unofficial Yahoo, then previously verified
+  Nasdaq CSVs. Every failure is recorded without a credential; no endless retries.
 - `--prices yahoo`: use Yahoo only; a failure is explicit. No silent fallback.
 - `--prices nasdaq`: use an already imported, hash-verified pair at
   `inputs/prices/<TICKER>.csv` and `inputs/prices/QQQ.csv`, or import both
@@ -83,6 +81,68 @@ The registry lookup and pricing can require external web access and can fail
 under site access restrictions. The original AAPL/GOOGL/NVDA dashboard remains
 a legacy three-company interface; flexible ticker selection is available via
 `run_all.py`.
+
+## Automatic daily price API providers (v0.4)
+
+**No CSV downloading is needed** when a supported authenticated provider works.
+The single command is still `python run_all.py` (interactive stock selection) or
+`python run_all.py --ticker TSLA`.
+
+The new price layer works in this order when `--prices auto`:
+
+1. A **SHA256-verified, 24-hour local cache** of a complete adjusted stock/QQQ pair.
+2. **Tiingo EOD** if environment variable `TIINGO_API_KEY` is set.
+3. **Twelve Data daily time series** if `TWELVEDATA_API_KEY` is set.
+4. **yfinance** as a no-key, unofficial option; its 429 limits are not retried.
+5. Previously imported, user-attested **Nasdaq raw Close/Last** pair.
+
+Each provider supplies **both** the selected stock and QQQ. We never silently
+mix Tiingo adjusted stock prices with Yahoo or raw Nasdaq QQQ prices. Adjusted
+daily price series use dividend/split-adjusted close, while Nasdaq manual CSVs
+use raw Close/Last; outputs explicitly record the distinction.
+
+### Setting up an API key (one-time)
+
+Sign up directly at [Tiingo](https://www.tiingo.com/) or
+[Twelve Data](https://twelvedata.com/). The respective API keys are private.
+Never paste them in GitHub issues, logs, research CSVs, or public repositories.
+
+For the active Terminal shell:
+
+```bash
+export TIINGO_API_KEY="YOUR_PRIVATE_TIINGO_TOKEN"
+# Or use:
+export TWELVEDATA_API_KEY="YOUR_PRIVATE_TWELVE_DATA_KEY"
+python run_all.py --ticker TSLA
+```
+
+For a **specific** provider without fallback:
+
+```bash
+python run_all.py --ticker TSLA --prices tiingo
+python run_all.py --ticker TSLA --prices twelvedata
+```
+
+Only call those commands when the matching environment variable is set.
+No credential is required for the Yahoo attempt or for already verified Nasdaq
+local CSVs. A failed provider is documented with a sanitized reason, without
+publishing the token; rate-limited responses are not automatically retried.
+
+Prices are cached under `inputs/cache/market_prices/<TICKER>/<PROVIDER>/`.
+Each cache contains a paired daily-price CSV and SHA256 manifest. Cache reads
+check ticker, provider, requested date coverage, freshness and file integrity.
+A cache that is stale, incomplete, altered or from the wrong provider is refused.
+
+Provider-specific practical caveats: Tiingo's EOD `adjClose` incorporates
+split and dividend adjustments. Twelve Data is called with `adjust=all`;
+free-tier history/coverage might still be limited by the user's plan and will
+be reported as a provider failure. Both generally require a free signup and
+an API key. yfinance is unofficial and can hit HTTP 429. No paid plans are
+automatically purchased.
+
+**An API success is not necessarily research success.** Insufficient historical
+news full text and nonvalidated publication times are independent limitations.
+Predictions are never generated just because market prices became available.
 
 ## Manual Nasdaq CSV naming and automatic import
 
