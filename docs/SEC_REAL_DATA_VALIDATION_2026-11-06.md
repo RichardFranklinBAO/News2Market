@@ -1,6 +1,6 @@
 # SEC EDGAR Real-Data Collection Validation — November 6, 2026
 
-**Scope:** Three *small, user-executed live SEC collection runs* using News2Market on a local Mac, as supplied in local `sec_collection_audit.json`, `sec_data_quality_report.md`, and (for AAPL/GOOGL) `sec_filings.csv`. The NVIDIA run also had a `research_audit.json`. This document records **observed extraction quality, not a market return study or an independently reproduced live benchmark**.
+**Scope:** Three *small, user-executed live SEC collection runs* using News2Market on a local Mac. Supplied files include collection audits and quality reports for all three issuers; the NVIDIA run included `research_audit.json`, and AAPL/GOOGL each additionally supplied `sec_filings.csv`, `research_audit.json`, and `research_features.csv`. The two newly supplied firm-level research CSVs were cross-checked row by row against the run audits. This document records **observed collection and text-scoring integrity, not a market return study or an independently repeated live benchmark**.
 
 ## Reproduction and provenance
 
@@ -39,18 +39,35 @@ The NVIDIA 10-Q was also recorded as `truncated` in the collection audit; its in
 
 **Interpretation:** The configured **1.5 MB HTTP-body cap** is a material issue for longer 10-Q/10-K HTML filings, even when the partially extracted text is shorter than the separate 240,000-character measurement cap. A response flagged truncated must not be scored as a complete disclosure. Do not raise caps indiscriminately to improve apparent coverage; audit memory, document sections, attachments and reproducibility first.
 
-## Measurement status — separate from collection success
+## LM scoring status — verified at the artifact level
 
-- **NVDA:** The separately supplied `research_audit.json` confirms **four eligible complete bodies scored with the official LM dictionary** and one truncated body excluded; the descriptive TF-IDF step used four documents. This is a processing validation, **not** evidence of economic predictiveness.
-- **AAPL and GOOGL:** These uploads include SEC collection audits, quality reports, and filing metadata manifests. The corresponding `research_audit.json` and `research_features.csv` files were **not supplied**, so **LM scoring and no-secondary-truncation results are not independently verified for these two issuer runs here**. Do not infer that every extracted body received a valid LM polarity result.
-- The GitHub Actions test suite checks offline code paths; it does not make real SEC HTTP requests and does not supply independent empirical evidence.
+| Issuer | Extracted complete bodies | Eligible SEC bodies scored by LM | Excluded truncated bodies | Among scored: missing LM polarity | LM secondary truncations in available feature CSV |
+|---|---:|---:|---:|---:|---|
+| NVDA | 4 | 4 | 1 | 0 | Not independently checked row by row (NVDA research audit only) |
+| AAPL | 4 | 4 | 1 | 0 | **0 / 4** |
+| GOOGL | 3 | 3 | 2 | 0 | **0 / 3** |
+| **Total** | **11** | **11** | **4** | **0** | **0 / 7 checked at row level** |
+
+- The three `research_audit.json` files report the *same official LM dictionary SHA256*, `e2d1328682bab7d2187684fb9f5420bb730401c9eefc00daf835edd203f4859d`, and an LM body cap of **240,000 characters**.
+- AAPL: all four eligible records contain nonempty LM token counts and polarity values, with `lm_text_truncated=False`; the 10-K marked `truncated` has **no LM score**. TF-IDF used four documents, with a maximum configured vocabulary of 2,500.
+- GOOGL: all three eligible 8-K records contain nonempty LM token counts and polarity values, with `lm_text_truncated=False`; the two truncated 10-Qs have **no LM scores**. TF-IDF used three documents, with 641 reported terms.
+- NVDA: the supplied research audit confirms four eligible scored documents and one excluded truncated document. Its row-level `research_features.csv` was not supplied, so a claim of *row-by-row independently checked* no-secondary-truncation for NVDA would exceed the evidence. 
+- The published counts are based on the user's machine-generated, real-SEC-run audit artifacts, and do not constitute independent re-extraction of the live source pages.
+
+### Measurement-validity caution from the newly verified feature rows
+
+In the supplied **AAPL 8-K primary-document** rows, both positive and negative LM word counts were **1 and 1** (polarity `0.0`). All three **GOOGL 8-K primary-document** rows also had **1 positive and 1 negative hit** (polarity `0.0`). This pattern could reflect repeated filing templates or a lack of substantive economic text in the selected *primary* document. **Do not interpret a zero lexicon polarity as an economically neutral event or a null market reaction.** Item-level exhibits and press releases were not yet fetched or semantically inspected.
+
+AAPL's two eligible 10-Qs have substantially more text and negative LM polarities of approximately **-0.742424** and **-0.794286**. These are **dictionary values, not measures of abnormal returns or verified financial news shocks**. A direct 8-K versus 10-Q comparison without controlling for source length, boilerplate, form and content would be invalid.
+
+The observed result validates **collection, integrity screening and deterministic LM scoring** for a small selected sample. It does **not** establish that LM represents firm fundamentals, economic surprises, trading signals, or predictive power.
 
 ## Restrictions and next steps
 
-1. Obtain AAPL and GOOGL `research_audit.json` and, preferably, `research_features.csv` from those exact runs. Verify eligible record counts, missing polarity, observed truncation flags and measurement source hashes.
+1. **Completed:** AAPL/GOOGL `research_audit.json` and `research_features.csv` were received and cross-checked. For a more extensive independently reproduced audit, retain full raw filing text and run-level checksums locally under applicable source terms.
 2. Prioritize **8-K primary documents** for the first historical extension, but review 8-K **exhibit coverage and substance** before claiming coverage of announcements.
 3. If deeper 10-Q/10-K analysis is warranted, implement **audited section-aware acquisition/extraction** rather than treating capped partial primary HTML as a whole document.
 4. Distinguish `filingDate`, `acceptanceDateTime`, independently verified **first public availability**, and the pre-specified next eligible **trading session**. Current acceptance fields do not certify event-time identification.
 5. Expand historical coverage only after documenting eligible yields, missingness by form and the terms of access. Neither sentiment-label validity nor stock-market forecasting is established by these 15 filings.
 
-**Bottom line:** The **live SEC collection and primary-body extraction paths are verified at small scale for NVDA, AAPL and GOOGL** based on submitted local run audits. The current research sample is too small, form-mixed and temporally unverified to support an asset-pricing claim or a Princeton-style standalone empirical paper.
+**Bottom line:** Small-sample **live SEC collection and LM research scoring are verified across all three issuers** using the supplied audits, with AAPL/GOOGL also checked at the feature-row level. This **completes the engineering pilot's three-company real-data validation milestone**. However, the 15 selected disclosures are too few, form-mixed, mostly short 8-K primary files, and temporally unverified to support an asset-pricing inference, a validated sentiment classifier, or a Princeton-style empirical research paper.

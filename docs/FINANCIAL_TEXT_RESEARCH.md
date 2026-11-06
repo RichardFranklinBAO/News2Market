@@ -63,7 +63,7 @@ Results/<TICKER>/Research/<UTC_RUN_ID>/
 
 Missing filings or unsupported documents are recorded instead of replaced with synthetic content. Raw source text in `corpus_local.csv` is **not included in GitHub**. The original News2Market `Results/` folders are untouched.
 
-**Live small-sample SEC validation now documented:** User-supplied runs collected 5 primary filings per issuer for NVDA, AAPL and GOOGL, with 11/15 complete primary-body extractions and 4/15 truncations. All 9 sampled 8-K primary bodies were extracted. This is **collection validation**, not a verified full historical archive or an event study; AAPL/GOOGL LM outcomes await separate research audit files. See [SEC Real-Data Validation (November 6, 2026)](SEC_REAL_DATA_VALIDATION_2026-11-06.md).
+**Live small-sample SEC collection and text scoring now documented:** User-supplied runs collected 5 primary filings per issuer for NVDA, AAPL and GOOGL, with **11/15 eligible primary bodies and 11 LM-scored records**, and **4/15 truncations excluded**. All 9 selected 8-K primary bodies were retrieved; only the primary filing documents were included, not all potentially important exhibits. AAPL/GOOGL `research_audit.json` and `research_features.csv` were inspected: **7/7 eligible feature rows had no secondary LM truncation**, while the three excluded rows had no scores. This is a **small-scale collection and measurement integrity check, not a verified historical archive, a validated sentiment measure, or a market event study**. See [SEC Real-Data Validation (November 6, 2026)](SEC_REAL_DATA_VALIDATION_2026-11-06.md).
 
 ## Data-quality safeguards and current validation status
 
