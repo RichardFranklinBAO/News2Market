@@ -12,7 +12,11 @@ import run_all
 class UnifiedRunnerTests(unittest.TestCase):
     def test_price_source_prefers_yahoo(self):
         response = ([{"date": "2026-01-06", "NVDA_close": 120,
-                      "QQQ_close": 100}], {"provider": "yahoo_via_unofficial_yfinance"})
+                      "QQQ_close": 100}], {
+            "provider": "yahoo_via_unofficial_yfinance",
+            "price_basis": "yfinance adjusted daily Close",
+            "sha256": {"NVDA": "a"*64, "QQQ": "b"*64},
+        })
         with patch("news2market.research.price_providers.read_pair_cache", return_value=None), \
              patch.object(run_all, "_price_rows_from_yahoo", return_value=response) as yahoo, \
              patch.object(run_all, "_price_rows_from_nasdaq") as nasdaq:
