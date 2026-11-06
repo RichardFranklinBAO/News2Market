@@ -389,7 +389,19 @@ def run(ticker="NVDA", start=None, end=None, news_days=90,
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="One-command News + SEC + LM + QQQ research")
+    parser = argparse.ArgumentParser(
+        description="One-command News + SEC + LM + QQQ research",
+        epilog=(
+            "Nasdaq CSV setup: download genuine stock + QQQ historical CSV files; "
+            "LEAVE them in Downloads, then run: "
+            "python run_all.py --ticker TSLA --prices nasdaq "
+            "--stock-csv ~/Downloads/HistoricalData_TSLA.csv "
+            "--qqq-csv ~/Downloads/HistoricalData_QQQ.csv --confirm-nasdaq. "
+            "The command validates and saves canonical files to "
+            "inputs/prices/TSLA.csv, inputs/prices/QQQ.csv and "
+            "SOURCE_MANIFEST.json. Later: python run_all.py --ticker TSLA --prices nasdaq. "
+            "Required columns: Date and Close/Last. Adjust filename paths to your actual downloads."
+        ))
     parser.add_argument("--ticker", default=None, help="US stock symbol e.g. NVDA, MSFT, AMD, TSLA")
     parser.add_argument("--interactive", action="store_true", help="Prompt for a US stock ticker in Terminal")
     parser.add_argument("--start", default=None, help="YYYY-MM-DD; default end minus news-days")
@@ -398,8 +410,10 @@ def main(argv=None):
     parser.add_argument("--max-news", type=int, default=15)
     parser.add_argument("--max-filings", type=int, default=50)
     parser.add_argument("--prices", choices=["auto", "yahoo", "nasdaq"], default="auto")
-    parser.add_argument("--stock-csv", type=Path, help="User-downloaded Nasdaq company historical CSV")
-    parser.add_argument("--qqq-csv", type=Path, help="User-downloaded Nasdaq QQQ historical CSV")
+    parser.add_argument("--stock-csv", type=Path,
+                        help="Original Nasdaq stock CSV (may stay in ~/Downloads); imported to inputs/prices/<TICKER>.csv")
+    parser.add_argument("--qqq-csv", type=Path,
+                        help="Original Nasdaq QQQ CSV (may stay in ~/Downloads); imported to inputs/prices/QQQ.csv")
     parser.add_argument("--confirm-nasdaq", action="store_true",
                         help="Attest both selected CSV files came from Nasdaq historical downloads")
     parser.add_argument("--sec-user-agent", default=None, help="Real name and contact email")
