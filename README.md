@@ -2,7 +2,7 @@
 
 **Company-aware financial news collection, auditable NLP measures, and exploratory empirical research.**
 
-News2Market is an independent Python research prototype. It collects company-related news and SEC disclosures, converts unstructured text into documented financial variables, checks data quality, and explores links with market outcomes. The current implementation supports **NVIDIA (NVDA), Apple (AAPL), and Alphabet (GOOGL)** through one configurable workflow; broader U.S. equity coverage is a future direction.
+News2Market is an independent Python research prototype. It collects company-related news and SEC disclosures, converts unstructured text into documented financial variables, checks data quality, and explores links with market outcomes. The unified Terminal runner supports SEC-CIK-verified U.S.-listed stocks through dynamic ticker lookup; the legacy browser dashboard remains limited to NVIDIA (NVDA), Apple (AAPL), and Alphabet (GOOGL).
 
 ## Research Motivation and Technical Contributions
 
@@ -21,6 +21,43 @@ News2Market is an independent Python research prototype. It collects company-rel
 - **Historical NVIDIA news pilot:** 30 announcements, 18 dated signal days; exploratory NVDA–QQQ return association **r = −0.0353, HC1 p ≈ 0.8602**. **No statistically significant relationship found.** [Research report](docs/RESEARCH_REPORT.md).
 
 This demonstrates **research data engineering and text-measurement integrity**, not validated market forecasting or causal identification.
+
+## Start here: where to put downloaded Nasdaq CSVs
+
+**Easiest method: leave the original Nasdaq files in `~/Downloads/`.** You do not need to rename or move them yourself. For a TSLA study, download **both TSLA and QQQ** historical CSVs directly from Nasdaq, then run from the project folder:
+
+```bash
+cd ~/Downloads/News2Market-main
+export N2M_SEC_USER_AGENT="Your Real Name your-real-email@example.com"
+python run_all.py --ticker TSLA --prices nasdaq \
+  --stock-csv "$HOME/Downloads/HistoricalData_TSLA.csv" \
+  --qqq-csv "$HOME/Downloads/HistoricalData_QQQ.csv" \
+  --confirm-nasdaq
+```
+
+Replace the filenames above with your **actual downloaded filenames** (case matters). The files must be genuine Nasdaq exports; `--confirm-nasdaq` records your attestation of their source. This command verifies and **automatically copies** them into the project:
+
+```text
+News2Market-main/
+  inputs/
+    Loughran-McDonald_MasterDictionary_1993-2025.csv
+    prices/
+      TSLA.csv
+      QQQ.csv
+      SOURCE_MANIFEST.json
+```
+
+**For later runs of the same ticker:** if the verified CSVs are already in `inputs/prices/`, just run:
+
+```bash
+python run_all.py --ticker TSLA --prices nasdaq
+```
+
+The project **requires the generated `SOURCE_MANIFEST.json`** to verify local CSV hashes and the selected ticker. Merely copying/renaming a CSV into `inputs/prices/` without using the import command is **not sufficient**.
+
+**Required Nasdaq CSV headers:** `Date` and `Close/Last`. `MM/DD/YYYY` or `YYYY-MM-DD` dates; price values such as `$245.50`. Columns such as `Volume`, `Open`, `High`, `Low` may remain. At least 3 unique valid dates are required; for meaningful analysis, get a multi-year history including future close dates after the text events. CSV contents alone do not certify the ticker; your explicit import assigns it. Raw Nasdaq prices are not dividend-adjusted.
+
+**Alternative:** `python run_all.py --ticker TSLA --prices auto` tries unofficial Yahoo Finance adjusted closes and falls back to an *already verified* local Nasdaq pair. If Yahoo is rate-limited and you have not imported TSLA + QQQ, the runner stops and explains the missing files. See [full guide](docs/ONE_COMMAND_WORKFLOW.md).
 
 ## One-command unified workflow (v0.3)
 
@@ -76,7 +113,7 @@ python -m unittest discover -s tests -v
 **External inputs (not included in GitHub):**
 
 - **Official LM dictionary:** obtain [Loughran–McDonald 1993–2025](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) and save as `inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv`.
-- **For market analysis:** download the selected company's and **QQQ** daily price CSVs from [Nasdaq](https://www.nasdaq.com/market-activity) and import both using the English dashboard. Automatic Nasdaq downloads are **not** supported. The SEC-only workflow does **not** need stock prices.
+- **For market analysis:** download the selected stock and **QQQ** historical CSVs from [Nasdaq](https://www.nasdaq.com/market-activity) and run the explicit `--stock-csv ... --qqq-csv ... --confirm-nasdaq` command above to auto-import them (no dashboard needed). Alternatively use `--prices auto` for unofficial Yahoo historical prices with a verified-local-Nasdaq fallback. The SEC-only workflow does **not** need stock prices.
 - **Optional AI labels:** install [Ollama](https://ollama.com/download) and run `ollama pull qwen2.5:1.5b`. The core LM workflow does not require Ollama or paid APIs.
 
 **Launch the English dashboard:**
