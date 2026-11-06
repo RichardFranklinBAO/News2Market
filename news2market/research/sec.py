@@ -62,15 +62,18 @@ class SecClient:
                 raise SecAccessError("SEC returned a redirect; automatic following is disabled")
             if response.status_code != 200:
                 raise SecAccessError(f"SEC returned HTTP {response.status_code}")
+            if not (1 <= int(max_bytes) <= 20_000_000):
+                raise ValueError('Unsafe SEC response byte cap')
             chunks=[];total=0;truncated=False
             for chunk in response.iter_content(chunk_size=64*1024):
-                if not chunk:
-                    continue
-                if total + len(chunk) > max_bytes:
-                    chunks.append(chunk[:max_bytes-total])
+                if not chunk:continue
+                remaining=max_bytes-total
+                if len(chunk)>remaining:
+                    if remaining:chunks.append(chunk[:remaining])
+                    total+=max(0,remaining)
                     truncated=True
                     break
-                chunks.append(chunk);total += len(chunk)
+                chunks.append(chunk);total+=len(chunk)
             raw=b"".join(chunks)
             return raw, {"sha256": hashlib.sha256(raw).hexdigest(), "bytes":len(raw),
                          "truncated":truncated, "content_type":response.headers.get("Content-Type","")}
@@ -79,7 +82,9 @@ class SecClient:
 
     def submissions(self,cik:str):
         cik_number=str(int(cik)).zfill(10)
-        raw,_ = self.get(f"{SEC_BASE}/submissions/CIK{cik_number}.json", max_bytes=10_000_000)
+        raw,meta = self.get(f"{SEC_BASE}/submissions/CIK{cik_number}.json", max_bytes=10_000_000)
+        if meta['truncated']:
+            raise SecAccessError('SEC submissions JSON exceeded local byte cap; refusing partial metadata')
         import json
         try:
             data=json.loads(raw)
@@ -87,6 +92,8 @@ class SecClient:
             raise SecAccessError("SEC submission response was not valid JSON") from e
         if not isinstance(data,dict) or "filings" not in data:
             raise SecAccessError("SEC submission JSON missing filings metadata")
+        if 'cik' in data and str(int(data['cik']))!=str(int(cik_number)):
+            raise SecAccessError('SEC response CIK does not match requested issuer')
         return data
 
 
@@ -153,11 +160,11 @@ def html_to_text(body:bytes, content_type:str="") -> str:
         raise ValueError("PDF primary documents are not supported")
     text=body.decode("utf-8",errors="replace")
     if "<html" not in text[:1000].lower() and "<body" not in text[:1000].lower() and not re.search(r"<\w+\b",text[:1000]):
-        return " ".join(html.unescape(text).split())[:MAX_TEXT_CHARS]
+        return " ".join(html.unescape(text).split())
     soup=BeautifulSoup(text,"html.parser")
     for item in soup(["script","style","noscript","svg","head"]):
         item.decompose()
-    return " ".join(soup.get_text(" ",strip=True).split())[:MAX_TEXT_CHARS]
+    return " ".join(soup.get_text(" ",strip=True).split())
 
 
 def fetch_bodies(client:SecClient,filings:list[dict]) -> tuple[list[dict],list[dict]]:
@@ -166,14 +173,21 @@ def fetch_bodies(client:SecClient,filings:list[dict]) -> tuple[list[dict],list[d
         row=original.copy()
         if not row["url"].lower().endswith((".htm",".html",".txt")):
             row["text_status"]="unsupported_primary_document_extension"
+            issues.append({'article_id':row['article_id'],'reason':'unsupported_primary_document_extension'})
         else:
             try:
                 raw,meta=client.get(row["url"])
                 content=html_to_text(raw,meta["content_type"])
+                row['downloaded_bytes']=meta['bytes']
+                row['raw_response_sha256']=meta['sha256']
+                row['response_truncated']=bool(meta['truncated'])
+                row['extracted_chars_before_cap']=len(content)
+                row["text_truncated"]=bool(meta["truncated"] or len(content)>MAX_TEXT_CHARS)
+                content=content[:MAX_TEXT_CHARS]
                 row["text"]=content
                 row["text_sha256"]=hashlib.sha256(content.encode()).hexdigest()
-                row["text_truncated"]=bool(meta["truncated"] or len(content)>=MAX_TEXT_CHARS)
-                row["text_status"]="extracted" if len(content)>=100 else "short_text"
+                row["text_status"]=('truncated' if row['text_truncated'] else
+                    ('extracted' if len(content)>=100 else 'short_text'))
             except SecAccessError as e:
                 row["text_status"]="access_denied_or_unavailable"
                 issues.append({"article_id":row["article_id"],"reason":str(e)})

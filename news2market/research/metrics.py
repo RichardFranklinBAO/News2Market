@@ -42,40 +42,82 @@ def canonical_rows(rows):
     return accepted,excluded
 
 
-def measure_rows(rows,lex, char_cap=200_000):
-    features=[]; no_text=0; missing_polarity=0
+def _as_bool(value):
+    if isinstance(value,bool):return value
+    return str(value).strip().lower() in ('1','true','yes','y')
+
+
+def text_quality(row, min_body_chars=100):
+    """Only complete article/disclosure BODY text is eligible for text features.
+
+    A title must not turn a metadata-only or partial disclosure into a result.
+    """
+    body=str(row.get('text') or row.get('body') or row.get('full_text') or '')
+    status=str(row.get('text_status') or '').strip().lower()
+    if status in ('not_retrieved','not_attempted_after_access_limit','access_denied_or_unavailable',
+                  'unsupported_primary_document_extension','unsupported_or_invalid_body'):
+        return 'metadata_only'
+    if _as_bool(row.get('text_truncated')) or status in ('truncated','partial','short_text'):
+        return 'partial_or_truncated'
+    if len(body.strip())<min_body_chars:
+        return 'missing_or_short_body'
+    # Unspecified status is common for legacy captured news CSVs; it is not a SEC claim.
+    if status and status not in ('extracted','complete','full',''):
+        return 'unverified_text_status'
+    return 'complete_body'
+
+
+def measure_rows(rows,lex,char_cap=200_000):
+    """Return audit rows for EVERY document, but score only complete bodies."""
+    features=[];missing_polarity=0;exclusions={};scored=0
     for r in rows:
-        body=str(r.get("text") or "")
-        title=str(r.get("title") or "")
-        if len(body.strip())<30:
-            no_text+=1
-        m=lex.score(title,body,char_cap=char_cap)
-        if m["lm_no_polarity_hits"]:missing_polarity+=1
-        features.append({
-          "article_id":r.get("article_id",""), "ticker":r.get("ticker",""),
-          "published_date":r.get("published_date",""),"accepted_datetime_raw":r.get("accepted_datetime_raw",""),
-          "published_time_quality":r.get("published_time_quality",""),
-          "source":r.get("source",""),"source_type":r.get("source_type",""),"form":r.get("form",""),
-          "url":r.get("url",""),"title":title,"text_status":r.get("text_status",""),
-          "text_sha256":hashlib.sha256(body.encode('utf-8')).hexdigest() if body else "",
-          "text_chars":len(body),"lm_positive_count":m["lm_positive_count"],
-          "lm_negative_count":m["lm_negative_count"],
-          "lm_uncertainty_count":m["lm_uncertainty_count"],
-          "lm_positive_per_1000":m["lm_positive_per_1000"],
-          "lm_negative_per_1000":m["lm_negative_per_1000"],
-          "lm_uncertainty_per_1000":m["lm_uncertainty_per_1000"],
-          "lm_polarity": "" if m["lm_no_polarity_hits"] else m["score"],
-          "lm_polarity_hits":m["lm_polarity_hits"],
-          "lm_token_count":m["lm_token_count"],"lm_text_truncated":m["lm_text_truncated"],
-        })
-    return features,{"documents":len(features),"short_or_missing_bodies":no_text,
-                     "missing_lm_polarity":missing_polarity,"dictionary_sha256":lex.sha256,
-                     "lm_measurement_definition":"word counts per 1,000 dictionary-tokenized words; secondary (P-N)/(P+N) if P+N>0"}
+        body=str(r.get('text') or '')
+        title=str(r.get('title') or '')
+        quality=text_quality(r)
+        eligible=(quality=='complete_body')
+        base={'article_id':r.get('article_id',''), 'ticker':r.get('ticker',''),
+              'company_identity_evidence':r.get('company_identity_evidence',''),
+              'published_date':r.get('published_date',''),'accepted_datetime_raw':r.get('accepted_datetime_raw',''),
+              'published_time_quality':r.get('published_time_quality',''),
+              'source':r.get('source',''),'source_type':r.get('source_type',''),
+              'form':r.get('form',''),'url':r.get('url',''),'title':title,
+              'text_status':r.get('text_status',''),'text_quality':quality,
+              'eligible_for_text_measurement':eligible,
+              'text_sha256':hashlib.sha256(body.encode('utf-8')).hexdigest() if body else '',
+              'text_chars':len(body),'text_truncated':_as_bool(r.get('text_truncated')),
+              'lm_positive_count':'','lm_negative_count':'','lm_uncertainty_count':'',
+              'lm_positive_per_1000':'','lm_negative_per_1000':'','lm_uncertainty_per_1000':'',
+              'lm_polarity':'','lm_polarity_hits':'','lm_token_count':'','lm_text_truncated':''}
+        if not eligible:
+            exclusions[quality]=exclusions.get(quality,0)+1
+        else:
+            # Text-only by design: article HEADLINE must not be treated as a disclosure body.
+            m=lex.score('',body,char_cap=char_cap)
+            scored+=1
+            if m['lm_no_polarity_hits']:missing_polarity+=1
+            base.update({'lm_positive_count':m['lm_positive_count'],
+                'lm_negative_count':m['lm_negative_count'],
+                'lm_uncertainty_count':m['lm_uncertainty_count'],
+                'lm_positive_per_1000':m['lm_positive_per_1000'],
+                'lm_negative_per_1000':m['lm_negative_per_1000'],
+                'lm_uncertainty_per_1000':m['lm_uncertainty_per_1000'],
+                'lm_polarity':'' if m['lm_no_polarity_hits'] else m['score'],
+                'lm_polarity_hits':m['lm_polarity_hits'],
+                'lm_token_count':m['lm_token_count'],
+                'lm_text_truncated':m['lm_text_truncated']})
+        features.append(base)
+    return features,{'documents':len(features),'eligible_complete_bodies':scored,
+        'excluded_from_scoring':len(features)-scored,'excluded_by_text_quality':exclusions,
+        'missing_lm_polarity_among_scored':missing_polarity,
+        'missing_lm_polarity':missing_polarity,
+        'dictionary_sha256':lex.sha256,
+        'lm_measurement_definition':'BODY ONLY: word counts per 1,000 dictionary-tokenized words; (P-N)/(P+N) when P+N>0; missing/partial text is never scored'}
 
 
 def tfidf_descriptives(rows, max_features=2500, top_k=8):
     """Descriptive vocabulary features fitted on this corpus; NOT an OOS model."""
-    data=[(str(r.get("title") or "")+" "+str(r.get("text") or "")).strip() for r in rows]
+    eligible=[r for r in rows if text_quality(r)=='complete_body']
+    data=[str(r.get('text') or '').strip() for r in eligible]
     if sum(bool(x) for x in data)<2:
         return [],{"status":"insufficient_texts","tfidf_is_sentiment":False}
     try:
@@ -90,13 +132,13 @@ def tfidf_descriptives(rows, max_features=2500, top_k=8):
         return [],{"status":"empty_vocabulary","tfidf_is_sentiment":False}
     terms=vectorizer.get_feature_names_out()
     output=[]
-    for i,row in enumerate(rows):
+    for i,row in enumerate(eligible):
         dense=matrix.getrow(i)
         order=sorted(zip(dense.indices,dense.data),key=lambda x:-x[1])[:top_k]
         for j,w in order:
             output.append({"article_id":row.get("article_id",""),"term":str(terms[j]),"tfidf_weight":round(float(w),6)})
     return output,{"status":"descriptive_only_not_sentiment", "vocabulary_size":len(terms),
-                   "documents":len(rows),"top_terms_per_document":top_k,"tfidf_is_sentiment":False,
+                   "documents":len(eligible),"excluded_from_tfidf":len(rows)-len(eligible),"top_terms_per_document":top_k,"tfidf_is_sentiment":False,
                    "warning":"Vectorizer fitted on full corpus for descriptive analysis only; refit on training data for predictive evaluation"}
 
 

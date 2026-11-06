@@ -45,7 +45,7 @@ python -m news2market research measure \
 
 ### Input/output format
 
-Saved article CSVs should have at least `article_id,title,text,published_date,source,url`. A `body` or `full_text` field can substitute for `text`. The optional `sec --news-csv` argument combines an existing local news collection with metadata/disclosures of the **same selected ticker**; the program does not establish ticker identity for a file merely because a user has named it accordingly.
+Saved article CSVs should have at least `article_id,title,text,published_date,source,url`. A `body` or `full_text` field can substitute for `text`. The optional `sec --news-csv` argument combines an existing local news collection with metadata/disclosures of the **same selected ticker**; the import now verifies a matching ticker and/or issuer CIK/official SEC URL when provided. If those are absent it may accept a company-name match in the title or on a specified issuer host but labels that match *heuristic*, not verified identity. Conflicting or unattributable records are excluded with an `identity_audit.json`; the requested ticker is not silently imposed on an unrelated record.
 
 All outputs are local, timestamped and ignored by Git:
 
@@ -56,9 +56,25 @@ Results/<TICKER>/Research/<UTC_RUN_ID>/
     research_features.csv    # LM Positive/Negative/Uncertainty rates and polarity
     tfidf_top_terms.csv      # Descriptive, untrained top TF-IDF terms per document
     research_audit.json      # Collection status, hashes, omissions and caveats
+    identity_audit.json      # Ticker/CIK/URL/name validation (local CSV mode)
+    sec_collection_audit.json # SEC form counts, text coverage and truncation (SEC mode)
+    sec_data_quality_report.md # Readable collection-quality summary (SEC mode)
 ```
 
 Missing filings or unsupported documents are recorded instead of replaced with synthetic content. Raw source text in `corpus_local.csv` is **not included in GitHub**. The original News2Market `Results/` folders are untouched.
+
+## Data-quality safeguards and current validation status
+
+**This section is implemented code, not a claim of live SEC verification.**
+
+- An SEC submission with no downloaded body remains in `sec_filings.csv` and the collection audit. It is **not** scored as disclosure sentiment from its filing title.
+- Only records with complete body text (at least 100 characters, with an acceptable extraction status and no byte/character truncation) are eligible for LM and descriptive TF-IDF. Short, blocked, missing, unsupported, and truncated bodies appear as **not scored** in `research_features.csv` and the audit.
+- SEC bodies default to a conservative 1.5 MB response cap and 240,000-character local text cap; both limits trigger an explicit **truncated** status, never `extracted`. Large 10-Ks may therefore have low eligibility. This is a quality safeguard, not an alternative to more capable parsers.
+- External CSV rows preserve their asserted ticker, CIK and original URL for issuer consistency checks. Conflicting identifiers are excluded; absent direct identifiers, a clear title/issuer-host mention can be included but is explicitly identified as **heuristic**. There is no claim of research-grade entity resolution.
+- `sec_collection_audit.json` reports form distribution, complete/partial/missing bodies, text length diagnostics, request count, and acceptance timestamp field presence; `sec_data_quality_report.md` is a companion human-readable quality report. A local submissions JSON snapshot is labelled **offline user-provided** rather than live collection.
+- `acceptanceDateTime` is preserved as received. No timezone-normalized *first market availability*, exchange-calendar mapping or intraday causal event window has been independently validated; such analysis is outside this release.
+
+**Verification performed for this safeguard release:** offline synthetic SEC/identity scenarios and a two-article saved publisher-news LM remeasurement. Live SEC 8-K retrieval and body quality on this environment are **not** independently verified. To validate on a real computer, use a genuine identifying `N2M_SEC_USER_AGENT`, run a small `--max-filings 5 --fetch-bodies` batch, and inspect both audit files. Respect rate limits/403/429 and do not infer success from a metadata-only run.
 
 ## Metrics and methodological integrity
 

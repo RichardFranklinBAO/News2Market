@@ -78,16 +78,16 @@ class TextMeasurementTests(unittest.TestCase):
                         'lm_positive_per_1000':10.0,'lm_negative_per_1000':0.0,'lm_uncertainty_per_1000':0.0,
                         'lm_polarity_hits':int(not missed),'lm_token_count':10,'score':1.0 if not missed else 0.0,
                         'lm_text_truncated':False}
-        rows=[{'article_id':'a','text':'This is purely factual and contains no category hit'},
-              {'article_id':'b','text':'strong growth may be expected later'}]
+        rows=[{'article_id':'a','text':'This is purely factual and contains no category hit. The document has several further descriptive sentences without anything resembling a change in company operating conditions. '},
+              {'article_id':'b','text':'strong growth may be expected later. The company described operational execution, new capacity plans, investment risks and its continuing financial disclosure work across the quarter. '}]
         out,audit=metrics.measure_rows(rows,FakeLex())
         self.assertEqual(out[0]['lm_polarity'],'')
         self.assertEqual(out[1]['lm_polarity'],1.0)
         self.assertEqual(audit['missing_lm_polarity'],1)
 
     def test_tfidf_is_explicitly_descriptive(self):
-        rows=[{'article_id':'a','title':'Battery production','text':'battery production grows production'},
-              {'article_id':'b','title':'Investment constraints','text':'investment constraints refinancing'}]
+        rows=[{'article_id':'a','title':'Battery production','text':'battery production grows production ' * 8},
+              {'article_id':'b','title':'Investment constraints','text':'investment constraints refinancing ' * 8}]
         got,audit=metrics.tfidf_descriptives(rows)
         self.assertFalse(audit['tfidf_is_sentiment'])
         if audit['status'].startswith('descriptive'):

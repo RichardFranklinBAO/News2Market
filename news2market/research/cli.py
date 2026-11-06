@@ -12,6 +12,7 @@ import sys
 from datetime import datetime,timezone
 from pathlib import Path
 from . import sec
+from .identity import validate_rows
 from .metrics import canonical_rows, load_official_lm, measure_rows,tfidf_descriptives,read_articles_csv,write_rows
 from .evaluation import benchmark_human_labels,read_human_labels,EvaluationNotSupported
 
@@ -45,10 +46,11 @@ def _score_corpus(rows,folder,dictionary,include_tfidf=True):
     feats,measurement=measure_rows(clean,lex)
     write_rows(folder/'corpus_local.csv',clean,fields=['article_id','ticker','published_date','accepted_datetime_raw',
         'published_time_quality','source','source_type','form','accession','url','title','text','text_status',
-        'text_sha256','text_truncated'])
+        'text_sha256','text_truncated','company_identity_evidence'])
     write_rows(folder/'research_features.csv',feats,fields=['article_id','ticker','published_date',
         'accepted_datetime_raw','published_time_quality','source','source_type','form','url','title','text_status',
-        'text_sha256','text_chars','lm_token_count','lm_positive_count','lm_negative_count',
+        'text_sha256','text_chars','text_truncated','text_quality','eligible_for_text_measurement',
+        'company_identity_evidence','lm_token_count','lm_positive_count','lm_negative_count',
         'lm_uncertainty_count','lm_positive_per_1000','lm_negative_per_1000','lm_uncertainty_per_1000',
         'lm_polarity_hits','lm_polarity','lm_text_truncated'])
     if include_tfidf:
@@ -57,8 +59,50 @@ def _score_corpus(rows,folder,dictionary,include_tfidf=True):
     else:diag={'status':'disabled'}
     return {'measurement':measurement,'tfidf':diag,'deduplicated':len(dropped),
             'excluded':dropped[:40], 'output_records':len(feats),
+            'text_scored_records':measurement['eligible_complete_bodies'],
             'warning':'Outputs are research measurements, not verified financial surprises or stock-return predictions'}
 
+
+def _collection_quality(rows,client=None):
+    from collections import Counter
+    statuses=Counter(str(r.get('text_status') or 'unknown') for r in rows)
+    lengths=[len(str(r.get('text') or '')) for r in rows if str(r.get('text_status'))=='extracted']
+    truncated=sum(bool(r.get('text_truncated')) for r in rows)
+    by_form=dict(Counter(str(r.get('form') or '') for r in rows))
+    return {'selected':len(rows),'by_form':by_form,'text_status_counts':dict(statuses),
+            'complete_bodies':statuses.get('extracted',0),
+            'truncated_bodies':truncated,
+            'missing_or_unusable_bodies':len(rows)-statuses.get('extracted',0),
+            'complete_body_rate':round(statuses.get('extracted',0)/len(rows),4) if rows else None,
+            'complete_body_chars':{'min':min(lengths) if lengths else None,
+              'max':max(lengths) if lengths else None,
+              'mean':round(sum(lengths)/len(lengths),1) if lengths else None},
+            'acceptance_timestamps_present':sum(bool(str(r.get('accepted_datetime_raw') or '').strip()) for r in rows),
+            'sec_http_requests':getattr(client,'requests_made',0),
+            'audit_limitation':'The counts document retrieval quality, not economic relevance or first market availability'}
+
+
+def _write_sec_quality_report(folder,quality):
+    """Human-readable retrieval audit; NOT an empirical research result."""
+    counts=quality.get('text_status_counts',{})
+    lines=['# SEC Collection Data-Quality Report','',
+        'This report summarizes **this run only**. It does not validate market information timing, trading returns, or all past SEC filings.','',
+        f"- Issuer: {quality.get('ticker')} (CIK {quality.get('cik')})",
+        f"- Source: {quality.get('source_mode')}",
+        f"- Selected filings: {quality.get('selected',0)}",
+        f"- Complete, scored-eligible bodies: {quality.get('complete_bodies',0)}",
+        f"- Truncated bodies (excluded from measurement): {quality.get('truncated_bodies',0)}",
+        f"- Missing, short, blocked, or unsupported bodies: {quality.get('missing_or_unusable_bodies',0)}",
+        f"- Requests made: {quality.get('sec_http_requests',0)}",
+        f"- Acceptance timestamp fields present: {quality.get('acceptance_timestamps_present',0)}",
+        '', '## Extraction status breakdown','']
+    lines.extend(f'- `{k}`: {v}' for k,v in sorted(counts.items()))
+    lines.extend(['', '## Interpretation', '',
+        'Truncated and metadata-only records are retained for provenance, but must not contribute LM or TF-IDF features.',
+        'A valid SEC acceptance field does not, by itself, establish first availability to market participants.',
+        'The default local 1.5 MB response cap and 240,000-character text cap can exclude large 10-K filings.',
+        'For live verification, use small 8-K batches and record any SEC 403/429 without retrying or circumventing it.',''])
+    (folder/'sec_data_quality_report.md').write_text('\n'.join(lines),encoding='utf-8')
 
 def command_sec(args):
     ticker,company=_company(args.ticker)
@@ -83,8 +127,14 @@ def command_sec(args):
             audit['sec_user_agent_declared']=True
             submissions=client.submissions(company['cik'])
             audit['submissions_source']='data.sec.gov API'
+        payload_cik=submissions.get('cik')
+        if payload_cik is not None and str(int(payload_cik))!=str(int(company['cik'])):
+            raise ValueError('SEC submissions JSON issuer CIK conflicts with selected ticker')
+        audit['submissions_cik_status']='matched' if payload_cik is not None else 'not_supplied_cannot_verify'
         rows=sec.select_filings(submissions,company['cik'],args.start,args.end,limit=args.max_filings)
-        for row in rows:row['ticker']=ticker
+        for row in rows:
+            row['ticker']=ticker
+            row['company_identity_evidence']='sec_submissions_cik_'+audit['submissions_cik_status']
         audit['disclosures_selected']=len(rows)
         if args.fetch_bodies and rows:
             agent=args.sec_user_agent or os.environ.get('N2M_SEC_USER_AGENT','')
@@ -100,23 +150,38 @@ def command_sec(args):
         # Header-only output is still useful when access to body text is disabled.
         write_rows(folder/'sec_filings.csv',rows,fields=['article_id','ticker','cik','form','accession',
           'published_date','accepted_datetime_raw','published_time_quality','source','source_type','url',
-          'title','text_status','text_truncated','text_sha256'])
+          'title','text_status','text_truncated','text_sha256','downloaded_bytes',
+          'raw_response_sha256','response_truncated','extracted_chars_before_cap','company_identity_evidence'])
+        quality=_collection_quality(rows,locals().get('client'))
+        quality.update({'ticker':ticker,'cik':company['cik'],
+                        'source':'SEC EDGAR','source_mode':audit['submissions_source'],
+                        'filing_date_range':audit['study_window'],
+                        'body_fetch_requested':bool(args.fetch_bodies),
+                        'real_sec_access_verified_in_this_run':audit['submissions_source']=='data.sec.gov API',
+                        'submissions_cik_status':audit['submissions_cik_status']})
+        write_json(folder/'sec_collection_audit.json',quality)
+        _write_sec_quality_report(folder,quality)
+        audit['sec_collection_quality']=quality
         if args.news_csv:
-            additional=read_articles_csv(args.news_csv)
-            for r in additional:r['ticker']=ticker
+            additional,identity=validate_rows(read_articles_csv(args.news_csv),ticker)
+            audit['additional_news_identity_audit']=identity
             rows.extend(additional)
             audit['additional_local_news']=len(additional)
             audit['news_csv_sha256']=hashlib.sha256(Path(args.news_csv).read_bytes()).hexdigest()
-        if any(len(str(r.get('text') or '').strip())>=30 for r in rows):
+        from .metrics import text_quality
+        if any(text_quality(r)=='complete_body' for r in rows):
             audit['research_scores']=_score_corpus(rows,folder,args.dictionary,not args.no_tfidf)
         else:
-            audit['research_scores']={'status':'no_full_text_available',
-                'how_to_proceed':'Add --fetch-bodies with N2M_SEC_USER_AGENT or --news-csv with saved articles'}
+            audit['research_scores']={'status':'no_eligible_complete_text_available',
+                'how_to_proceed':'Add --fetch-bodies with N2M_SEC_USER_AGENT or --news-csv with verified saved articles; truncated text is excluded'}
         audit['status']='completed_with_limitations'
     except Exception as e:
         audit['status']='failed'
         audit['error']=f'{type(e).__name__}: {str(e)[:400]}'
         write_json(folder/'research_audit.json',audit)
+        if not (folder/'sec_collection_audit.json').exists():
+            write_json(folder/'sec_collection_audit.json',{'status':'failed_or_incomplete',
+                'ticker':ticker,'error':audit['error'],'real_sec_access_verified':False})
         raise
     write_json(folder/'research_audit.json',audit)
     return folder,audit
@@ -131,9 +196,16 @@ def command_measure(args):
             p=Path(inp)
             original.extend(read_articles_csv(p))
             hashes[str(p.name)]=hashlib.sha256(p.read_bytes()).hexdigest()
-        for r in original:r['ticker']=ticker
-        results=_score_corpus(original,folder,args.dictionary,not args.no_tfidf)
-        audit={'status':'complete','ticker':ticker,'inputs_sha256':hashes,'outputs':results,
+        accepted,identity=validate_rows(original,ticker)
+        if not accepted:
+            write_json(folder/'identity_audit.json',identity)
+            raise ValueError('No input rows have acceptable issuer identity; see identity_audit.json')
+        write_json(folder/'identity_audit.json',identity)
+        from .metrics import text_quality
+        if not any(text_quality(r)=='complete_body' for r in accepted):
+            raise ValueError('No complete article bodies available; metadata/partial text cannot be scored')
+        results=_score_corpus(accepted,folder,args.dictionary,not args.no_tfidf)
+        audit={'status':'complete','ticker':ticker,'inputs_sha256':hashes,'identity':identity,'outputs':results,
             'limitations':['No human-valid sentiment labels are inferred by this command',
                            'TF-IDF is a text representation, not an economic-shock measure',
                            'XLex transformer/SHAP training was not run']}
@@ -149,13 +221,21 @@ def command_benchmark(args):
     folder=run_folder(ticker,args.output_root)
     try:
         raw=read_articles_csv(args.corpus_csv)
-        data,_=canonical_rows(raw)
+        verified,identity=validate_rows(raw,ticker)
+        if not verified:
+            write_json(folder/'identity_audit.json',identity)
+            raise ValueError('Benchmark has no issuer-verified corpus rows')
+        write_json(folder/'identity_audit.json',identity)
+        data,_=canonical_rows(verified)
+        from .metrics import text_quality
+        data=[r for r in data if text_quality(r)=='complete_body']
         labels=read_human_labels(args.labels_csv)
         lex=load_official_lm(args.dictionary)
         result=benchmark_human_labels(data,labels,lex)
         audit={'status':'complete','ticker':ticker,'result':result,
                'corpus_sha256':hashlib.sha256(Path(args.corpus_csv).read_bytes()).hexdigest(),
                'labels_sha256':hashlib.sha256(Path(args.labels_csv).read_bytes()).hexdigest(),
+               'identity':identity,
                'note':'Human labels are user asserted and have not been independently checked by the tool'}
         write_json(folder/'human_label_benchmark.json',audit)
         return folder,audit
