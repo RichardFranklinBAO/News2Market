@@ -175,7 +175,9 @@ def align_features_with_prices(feature_rows, price_rows, ticker, min_directional
     return out, audit
 
 
-def run_market_integration(ticker, features_csv, output_folder, *, min_directional_hits=3):
+def run_market_integration(ticker, features_csv, output_folder, *,
+                           min_directional_hits=3, price_rows=None,
+                           price_provenance=None):
     """Read a local research_features.csv and locally source-verified Nasdaq CSV pair."""
     from news2market.core import price_status, _read_price_csv, INPUTS
     ticker = ticker.upper()
@@ -188,21 +190,44 @@ def run_market_integration(ticker, features_csv, output_folder, *, min_direction
         features = list(csv.DictReader(f))
     if not features:
         raise ValueError("No feature records found")
-    state = price_status(ticker)
-    if not state["ready"]:
-        raise ValueError("Import verified Nasdaq " + ticker + " and QQQ CSVs in the dashboard first")
-    stock, _ = _read_price_csv(INPUTS / "prices" / (ticker + ".csv"), ticker)
-    qqq, _ = _read_price_csv(INPUTS / "prices" / "QQQ.csv", "QQQ")
-    prices = [{"date": d, f"{ticker}_close": stock[d], "QQQ_close": qqq[d]}
-              for d in sorted(set(stock) & set(qqq))]
+    if price_rows is None:
+        # Legacy research market CLI: explicitly verified user-imported Nasdaq pair.
+        state = price_status(ticker)
+        if not state["ready"]:
+            raise ValueError("Import verified Nasdaq " + ticker + " and QQQ CSVs in the dashboard first")
+        stock, _ = _read_price_csv(INPUTS / "prices" / (ticker + ".csv"), ticker)
+        qqq, _ = _read_price_csv(INPUTS / "prices" / "QQQ.csv", "QQQ")
+        prices = [{"date": d, f"{ticker}_close": stock[d], "QQQ_close": qqq[d]}
+                  for d in sorted(set(stock) & set(qqq))]
+        price_hashes = {
+            sym: hashlib.sha256((INPUTS / "prices" / (sym + ".csv")).read_bytes()).hexdigest()
+            for sym in (ticker, "QQQ")
+        }
+        price_info = {
+            sym: {k: v for k, v in state["files"][sym].items()
+                  if k in ("source", "rows", "first_date", "last_date")}
+            for sym in (ticker, "QQQ")
+        }
+        price_mode = "user_verified_nasdaq_raw_close"
+    else:
+        # Unified runner: price inputs are explicitly passed with source hashes.
+        # This avoids ever misreporting Yahoo prices as Nasdaq-verified prices.
+        if not isinstance(price_provenance, dict):
+            raise ValueError("External price rows require documented price_provenance")
+        hashes = price_provenance.get("sha256")
+        if not isinstance(hashes, dict) or not all(
+                isinstance(hashes.get(sym), str) and len(hashes[sym]) == 64
+                for sym in (ticker, "QQQ")):
+            raise ValueError("External price rows require original source file SHA256 for both symbols")
+        prices = list(price_rows)
+        price_hashes = {sym: hashes[sym] for sym in (ticker, "QQQ")}
+        price_info = price_provenance
+        price_mode = str(price_provenance.get("provider", "external_verified"))
     events, audit = align_features_with_prices(features, prices, ticker, min_directional_hits)
     audit["features_csv_sha256"] = hashlib.sha256(p.read_bytes()).hexdigest()
-    audit["price_csv_sha256"] = {s: hashlib.sha256((INPUTS / "prices" / (s + ".csv")).read_bytes()).hexdigest()
-                                for s in (ticker, "QQQ")}
-    audit["prices"] = {
-        sym: {k: v for k, v in state["files"][sym].items() if k in ("source", "rows", "first_date", "last_date")}
-        for sym in (ticker, "QQQ")
-    }
+    audit["price_csv_sha256"] = price_hashes
+    audit["prices"] = price_info
+    audit["price_source_mode"] = price_mode
     output = Path(output_folder)
     output.mkdir(parents=True, exist_ok=True)
     with (output / "market_event_alignment.csv").open("w", encoding="utf-8", newline="") as f:
