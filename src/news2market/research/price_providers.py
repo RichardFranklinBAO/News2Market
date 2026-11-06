@@ -62,8 +62,11 @@ def _series(symbol, records, day_key, price_key, start, end):
 
 def _response_get(session, url, *, headers=None, params=None):
     # Never echo response text, URL with API keys, or authentication headers.
-    resp = session.get(url, headers=headers, params=params, timeout=25,
-                       allow_redirects=False)
+    try:
+        resp = session.get(url, headers=headers, params=params, timeout=25,
+                           allow_redirects=False)
+    except requests.RequestException:
+        raise RuntimeError("Provider connection error (network or timeout); credentials redacted") from None
     if resp.status_code in (403, 429):
         raise RuntimeError("Provider access denied or rate limited (HTTP "
                            + str(resp.status_code) + "); no automatic retries")
@@ -91,7 +94,7 @@ def _compose_pair(ticker, output, basis, provider, hashes, start, end):
         "provider": provider, "price_basis": basis,
         "first_date": dates[0], "last_date": dates[-1],
         "matched_sessions": len(dates),
-        "response_sha256": hashes,
+        "response_sha256": hashes, "sha256": hashes,
         "requested_start": start.isoformat(),
         "requested_end": end.isoformat(),
         "fetched_utc": datetime.now(timezone.utc).isoformat(),
@@ -237,7 +240,9 @@ def read_pair_cache(ticker, start, end, root, *, provider=None, now=None):
                 "first_date": rows[0]["date"], "last_date": rows[-1]["date"],
                 "matched_sessions": len(rows), "cache_hit": True,
                 "cached_utc": meta["cached_utc"],
-                "sha256": {ticker: meta["sha256"], "QQQ": meta["sha256"]},
+                "sha256": meta.get("response_sha256") or {
+                    ticker: meta["sha256"], "QQQ": meta["sha256"]},
+                "cache_file_sha256": meta["sha256"],
                 "response_sha256": meta.get("response_sha256", {}),
                 "adjusted_for_splits_and_dividends": True,
                 "limitations": ["Verified, provider-labeled 24h local cache; does not establish live price freshness",
