@@ -89,12 +89,12 @@ class CompanySwitchTests(unittest.TestCase):
                                   "rows":3,"first_date":"2026-11-02","last_date":"2026-11-04"}
             (old_prices/"SOURCE_MANIFEST.json").write_text(json.dumps(manifest))
             try:
-                v.ROOT=fresh;v.INPUTS=fresh/"Inputs"
+                v.ROOT=fresh;v.INPUTS=fresh/"inputs"
                 self.assertFalse(v.price_status("NVDA")["ready"])
                 v._reuse_previous_project_csv("NVDA",log=lambda m:None)
                 v._reuse_previous_project_csv("QQQ",log=lambda m:None)
                 self.assertTrue(v.price_status("NVDA")["ready"])
-                self.assertTrue((fresh/"Inputs"/"prices"/"NVDA.csv").exists())
+                self.assertTrue((fresh/"inputs"/"prices"/"NVDA.csv").exists())
                 self.assertTrue((old_prices/"NVDA.csv").exists())
             finally:v.ROOT=original_root;v.INPUTS=original_inputs
 
@@ -102,7 +102,7 @@ class CompanySwitchTests(unittest.TestCase):
         from unittest.mock import patch
         with tempfile.TemporaryDirectory() as tmp:
             original=v.INPUTS
-            v.INPUTS=Path(tmp)/"Inputs"
+            v.INPUTS=Path(tmp)/"inputs"
             try:
                 self.assertFalse(v.lm_dictionary_status()["ready"])
                 with patch.object(v,"ensure_lm_dictionary",side_effect=RuntimeError("Official LM dictionary not installed")):
@@ -119,7 +119,7 @@ class CompanySwitchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             original_inputs,original_root=v.INPUTS,v.ROOT
             try:
-                v.INPUTS=Path(tmp)/"Inputs";v.ROOT=Path(tmp)/"News2Market_B"
+                v.INPUTS=Path(tmp)/"inputs";v.ROOT=Path(tmp)/"News2Market_B"
                 result=v.lm_dictionary_status()
                 self.assertFalse(result["ready"])
                 self.assertEqual(result["source"],"missing")
@@ -147,7 +147,7 @@ class CompanySwitchTests(unittest.TestCase):
     def test_stage_files_are_named_by_function(self):
         """Avoid old sequence numbers and verify key dynamic imports."""
         import re
-        scripts=Path(__file__).resolve().parents[1]/"Scripts"
+        scripts=Path(__file__).resolve().parents[1]/"scripts"
         names={p.name for p in scripts.glob("*.py")}
         expected={
             "external_article_fetcher.py", "lm_sentiment.py", "event_tagging.py",
@@ -160,6 +160,15 @@ class CompanySwitchTests(unittest.TestCase):
         self.assertFalse(any(re.match(r"^[0-9]",s) for s in names))
         self.assertTrue(callable(v.load_script_module("nasdaq_csv_parser.py","n2m_price_smoke").parse_price_csv))
         self.assertTrue(callable(v.load_script_module("news_feed_discovery.py","n2m_feed_smoke").discover))
+
+    def test_lowercase_directory_convention(self):
+        """Tracked root paths use lowercase names; old input folders are legacy only."""
+        repo=Path(__file__).resolve().parents[1]
+        root_names={p.name for p in repo.iterdir()}
+        self.assertTrue({"scripts","inputs","docs","src","tests"}.issubset(root_names))
+        self.assertTrue({"Scripts","Inputs"}.isdisjoint(root_names))
+        self.assertEqual(v.SCRIPTS,repo/"scripts")
+        self.assertEqual(v.INPUTS,repo/"inputs")
 
     def test_webpage_english_only_and_no_yahoo(self):
         html=(Path(__file__).resolve().parents[1]/"src"/"news2market"/"ui"/"index.html").read_text(encoding="utf-8")

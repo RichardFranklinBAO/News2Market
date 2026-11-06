@@ -46,7 +46,7 @@ python -m unittest discover -s tests -v
 
 **External inputs (not included in GitHub):**
 
-- **Official LM dictionary:** obtain [Loughran–McDonald 1993–2025](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) and save as `Inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv`.
+- **Official LM dictionary:** obtain [Loughran–McDonald 1993–2025](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) and save as `inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv`.
 - **For market analysis:** download the selected company's and **QQQ** daily price CSVs from [Nasdaq](https://www.nasdaq.com/market-activity) and import both using the English dashboard. Automatic Nasdaq downloads are **not** supported. The SEC-only workflow does **not** need stock prices.
 - **Optional AI labels:** install [Ollama](https://ollama.com/download) and run `ollama pull qwen2.5:1.5b`. The core LM workflow does not require Ollama or paid APIs.
 
@@ -80,8 +80,8 @@ Lexicon polarity and optional Qwen labels are **not independently validated econ
 
 ~~~text
 src/news2market/   Main Python package, SEC research, and English UI
-Scripts/           News collection and financial-text helper modules
-Inputs/            Locally installed dictionary and market CSVs
+scripts/           News collection and financial-text helper modules
+inputs/            Locally installed dictionary and market CSVs
 tests/             Offline regression and quality checks
 docs/              Real-data audits, research reports, full methods
 ~~~

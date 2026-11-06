@@ -1,11 +1,11 @@
 # Third-party academic dictionary, local raw price data and results
-Inputs/Loughran-McDonald_MasterDictionary_*.csv
-Inputs/prices/*.csv
-!Inputs/prices/EXAMPLE_FORMAT.csv
-Inputs/cache/*
-!Inputs/cache/.gitkeep
-Inputs/demo_articles.csv
-Inputs/demo_prices.csv
+inputs/Loughran-McDonald_MasterDictionary_*.csv
+inputs/prices/*.csv
+!inputs/prices/EXAMPLE_FORMAT.csv
+inputs/cache/*
+!inputs/cache/.gitkeep
+inputs/demo_articles.csv
+inputs/demo_prices.csv
 Results/*
 !Results/.gitkeep
 .env
@@ -24,6 +24,16 @@ __pycache__/
 # Final project: virtual environment, local data manifests, temporary inputs
 .venv/
 venv/
+inputs/prices/SOURCE_MANIFEST.json
+inputs/prices/.*.tmp
+inputs/.*.tmp
+
+# Protect private inputs in older local clones as well
+Inputs/Loughran-McDonald_MasterDictionary_*.csv
+Inputs/prices/*.csv
+Inputs/cache/*
+Inputs/demo_articles.csv
+Inputs/demo_prices.csv
 Inputs/prices/SOURCE_MANIFEST.json
 Inputs/prices/.*.tmp
 Inputs/.*.tmp

@@ -21,7 +21,7 @@ Tests should finish with **OK**; a test dependent on the official dictionary may
 Obtain the official Loughran–McDonald 1993–2025 CSV from [Notre Dame SRAF](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) and save it with this exact path:
 
 ```text
-Inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv
+inputs/Loughran-McDonald_MasterDictionary_1993-2025.csv
 ```
 
 Do not commit the dictionary or third-party market/news source data. This is required for **both** LM analysis modes.

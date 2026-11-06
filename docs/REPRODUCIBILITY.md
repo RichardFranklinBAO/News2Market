@@ -18,7 +18,7 @@ A private repository requires collaborator access. Run the tests before beginnin
 
 ## Research inputs
 
-* **Financial lexicon:** Obtain `Loughran-McDonald_MasterDictionary_1993-2025.csv` from [Notre Dame SRAF](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) and save at `Inputs/` under exactly that filename. The app checks it before making news requests; the lexicon is not included in GitHub.
+* **Financial lexicon:** Obtain `Loughran-McDonald_MasterDictionary_1993-2025.csv` from [Notre Dame SRAF](https://sraf.nd.edu/loughranmcdonald-master-dictionary/) and save at `inputs/` under exactly that filename. The app checks it before making news requests; the lexicon is not included in GitHub.
 * **Market prices:** Official Nasdaq historical CSVs for the chosen `NVDA`, `AAPL`, or `GOOGL` stock **and QQQ**. See direct provider links in the root README. The files must contain `Date` and `Close/Last`; select and import them in the dashboard after confirming source and ticker. The app records SHA-256, source-confirmation, observed date coverage and row counts. Neither Yahoo nor an unauthorized Nasdaq crawler is used.
 * **Article bodies:** New issuer/publisher announcements are discovered via permitted public feeds and HTML; original third-party full texts are not redistributed with the repo. The exact same historical news snapshots cannot be reconstructed from their URLs alone.
 

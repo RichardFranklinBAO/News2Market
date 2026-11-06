@@ -5,7 +5,7 @@ No user-curated article URLs, no GDELT dependency, no paid API.
 No authentication bypass, CAPTCHA bypass, rotating identities or paywall circumvention.
 
 Run (Mac Terminal, inside the News2Market project):
-    python Scripts/news_feed_discovery.py --ticker NVDA --query NVIDIA --days 30 --max-external 5
+    python scripts/news_feed_discovery.py --ticker NVDA --query NVIDIA --days 30 --max-external 5
 
 Outputs a NEW Results/<ticker>/ExternalAuto/<run_id>/ directory. Does not change LATEST.txt.
 Only extracted full article bodies count as full-text news. RSS summaries are metadata only.
@@ -31,7 +31,7 @@ from urllib.parse import parse_qs, quote, unquote, urlencode, urljoin, urlparse,
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / 'Scripts'
+SCRIPTS = ROOT / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
 
 UA = 'News2MarketResearch/2.2.7 (+academic research; RSS discovery, respectful access)'
@@ -208,7 +208,7 @@ def page_date(html):
 def original_fetcher_module():
     path = SCRIPTS / 'external_article_fetcher.py'
     if not path.exists():
-        raise RuntimeError('Missing existing Scripts/external_article_fetcher.py; reinstall the complete News2Market repository')
+        raise RuntimeError('Missing existing scripts/external_article_fetcher.py; reinstall the complete News2Market repository')
     spec = importlib.util.spec_from_file_location('n2m_external_extractor',path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

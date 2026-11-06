@@ -1,6 +1,6 @@
 """News2Market: reproducible three-company research workbench.
 
-Needs existing Scripts/ directory and locally installed official LM dictionary.
+Needs existing scripts/ directory and locally installed official LM dictionary.
 The reported price/return analysis is exploratory, not a trading model.
 """
 from __future__ import annotations
@@ -23,8 +23,8 @@ from typing import Callable
 from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = ROOT / "Scripts"
-INPUTS = ROOT / "Inputs"
+SCRIPTS = ROOT / "scripts"
+INPUTS = ROOT / "inputs"
 RESULTS = ROOT / "Results"
 SCRIPT_NAMES = {"lm_sentiment.py", "text_preparation.py", "lm_cleaning_comparison.py", "event_tagging.py"}
 BENCHMARK = "QQQ"
@@ -109,7 +109,7 @@ def subtract_years(d, years):
 
 def scripts_on_path():
     if not SCRIPTS.is_dir() or not (SCRIPTS / "lm_dictionary.py").exists():
-        raise FileNotFoundError("Required Scripts/ helper modules are missing; reinstall the complete repository")
+        raise FileNotFoundError("Required scripts/ helper modules are missing; reinstall the complete repository")
     if str(SCRIPTS) not in sys.path:
         sys.path.insert(0, str(SCRIPTS))
 
@@ -263,13 +263,13 @@ def lm_dictionary_status():
     candidates=[ROOT.parent / name / "Inputs" / LM_FILENAME
                 for name in ("News2Market", "News2Market_GitHub_Test")]
     if destination.is_file():
-        return {"ready":True,"source":"this_project","file":f"Inputs/{LM_FILENAME}"}
+        return {"ready":True,"source":"this_project","file":f"inputs/{LM_FILENAME}"}
     for path in candidates:
         if path.is_file():
             return {"ready":False,"available_to_reuse":True,"source":"existing_local_project",
-                    "file":f"Inputs/{LM_FILENAME}"}
+                    "file":f"inputs/{LM_FILENAME}"}
     return {"ready":False,"available_to_reuse":False,"source":"missing",
-            "file":f"Inputs/{LM_FILENAME}","official_download":LM_OFFICIAL_URL}
+            "file":f"inputs/{LM_FILENAME}","official_download":LM_OFFICIAL_URL}
 
 
 def ensure_lm_dictionary(log=print):
@@ -302,7 +302,7 @@ def ensure_lm_dictionary(log=print):
     if not destination.is_file():
         raise RuntimeError(
             "Official Loughran–McDonald dictionary not installed. Before running research, "
-            f"download {LM_FILENAME} from {LM_OFFICIAL_URL} and save it as Inputs/{LM_FILENAME}. "
+            f"download {LM_FILENAME} from {LM_OFFICIAL_URL} and save it as inputs/{LM_FILENAME}. "
             "If an earlier sibling News2Market project contains the official CSV, the dashboard can reuse it automatically. "
             "The full dictionary is not included in GitHub for redistribution-rights reasons. "
             "No news requests were started."
@@ -311,7 +311,7 @@ def ensure_lm_dictionary(log=print):
         lex=load_lm_dictionary(path=destination)
     except (ValueError,OSError,UnicodeError) as exc:
         raise RuntimeError(
-            f"Invalid official LM dictionary at Inputs/{LM_FILENAME}: {exc}. "
+            f"Invalid official LM dictionary at inputs/{LM_FILENAME}: {exc}. "
             f"Download a fresh copy from {LM_OFFICIAL_URL}. No news requests were started."
         ) from exc
     log(f"Official LM dictionary ready: {lex.file_words:,} terms; SHA-256 {lex.sha256[:12]}…")
@@ -440,7 +440,7 @@ def price_status(ticker):
     for sym in (ticker,BENCHMARK):
         path=_price_folder()/f"{sym}.csv"
         is_verified=path.is_file() and _nasdaq_evidence(sym,path,manifest)
-        entry={"symbol":sym,"ready":bool(is_verified),"local_file":f"Inputs/prices/{sym}.csv",
+        entry={"symbol":sym,"ready":bool(is_verified),"local_file":f"inputs/prices/{sym}.csv",
                "download_page":NAS_PRICE_LINKS[sym]}
         if is_verified:
             m=manifest[sym]

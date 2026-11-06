@@ -7,7 +7,7 @@ import yaml
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
-INPUTS = ROOT/'Inputs'
+INPUTS = ROOT/'inputs'
 RESULTS = Path(os.environ.get('N2M_RESULTS_DIR',str(ROOT/'Results')))
 RESULTS.mkdir(parents=True,exist_ok=True)
 
