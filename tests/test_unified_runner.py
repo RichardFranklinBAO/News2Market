@@ -45,6 +45,30 @@ class UnifiedRunnerTests(unittest.TestCase):
                 run_all.run(agent="not-an-email")
             lm.assert_not_called()
 
+    def test_missing_prices_stop_before_news_or_sec_requests(self):
+        from news2market import core
+        verified = {
+            "ticker": "TSLA", "name": "Tesla Inc",
+            "cik": "0001318605", "query": "Tesla", "aliases": ["TSLA", "Tesla"],
+            "official_host": "",
+        }
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(core, "ensure_lm_dictionary"), \
+             patch("news2market.research.symbol_registry.resolve_stock", return_value=verified), \
+             patch.object(run_all, "_prices", side_effect=RuntimeError("Yahoo rate limited")), \
+             patch.object(run_all, "_news_rows") as news, \
+             patch.object(run_all.research_cli, "command_sec") as sec:
+            with self.assertRaisesRegex(RuntimeError, "Yahoo rate limited"):
+                run_all.run(ticker="TSLA", start="2026-01-01",
+                            end="2026-01-08", agent="Tester test@example.com",
+                            output_root=Path(tmp), log=lambda _: None)
+            news.assert_not_called()
+            sec.assert_not_called()
+            audits = list(Path(tmp).rglob("unified_audit.json"))
+            self.assertEqual(len(audits), 1)
+            self.assertIn("Yahoo rate limited", audits[0].read_text())
+            self.assertIn("failed_or_partial", audits[0].read_text())
+
     def test_one_command_plumbs_all_stages_with_mocks(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
