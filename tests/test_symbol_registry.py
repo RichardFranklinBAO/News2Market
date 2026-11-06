@@ -57,6 +57,32 @@ class SymbolRegistryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 sr.resolve_stock("FAKE", "Researcher test@example.com", Path(tmp))
 
+    def test_canonical_nasdaq_files_can_be_registered_by_explicit_confirmation(self):
+        from news2market import core
+        from news2market.research.symbol_registry import resolve_stock
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "inputs" / "prices"
+            base.mkdir(parents=True)
+            original = ("Date,Close/Last,Volume\n"
+                        "11/02/2026,$300,100\n"
+                        "11/03/2026,$301,200\n"
+                        "11/04/2026,$302,200\n")
+            (base/"MSFT.csv").write_text(original)
+            (base/"QQQ.csv").write_text(original.replace("$300", "$500"))
+            with patch.object(core, "INPUTS", Path(tmp) / "inputs"):
+                self.assertFalse(core._nasdaq_evidence("MSFT", base/"MSFT.csv"))
+                registered = run_all.import_nasdaq_pair(
+                    "MSFT", base/"MSFT.csv", base/"QQQ.csv",
+                    confirmed_nasdaq=True,
+                )
+                self.assertEqual(registered["MSFT"]["rows"], 3)
+                self.assertTrue(core._nasdaq_evidence("MSFT", base/"MSFT.csv"))
+                self.assertTrue(core._nasdaq_evidence("QQQ", base/"QQQ.csv"))
+                rows, audit = run_all._price_rows_from_nasdaq("MSFT")
+                self.assertEqual(len(rows), 3)
+                self.assertEqual(audit["provider"], "nasdaq_user_verified_local")
+
     def test_nasdaq_pair_attribution_requires_user_confirmation(self):
         from news2market import core
         with tempfile.TemporaryDirectory() as tmp:
