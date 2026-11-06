@@ -190,34 +190,69 @@ def import_nasdaq_pair(ticker: str, stock_csv: Path, qqq_csv: Path,
             for sym, v in validated.items()}
 
 
-def _prices(ticker: str, start: date, end: date, folder: Path, mode: str, log=print):
+def _prices(ticker: str, start: date, end: date, folder: Path, mode: str,
+            log=print):
+    """Cache -> credentialed stable APIs -> Yahoo -> verified local Nasdaq.
+
+    One stock/QQQ pair always comes from one provider, with one price basis.
+    Never retry a rate-limited source in a loop.
+    """
+    from news2market.research import price_providers as providers
+    root = core.INPUTS / "cache" / "market_prices"
     errors = []
-    if mode in ("auto", "yahoo"):
+    if mode in ("auto", "tiingo", "twelvedata", "yahoo"):
+        # Allow a fresh, hash-verified source-specific cache.
+        provider_name = {"tiingo": "tiingo_eod_adjusted",
+                         "twelvedata": "twelvedata_eod_adjusted",
+                         "yahoo": "yahoo_via_unofficial_yfinance"}.get(mode)
+        cached = providers.read_pair_cache(ticker, start, end, root,
+                                           provider=provider_name)
+        if cached is not None:
+            log("Prices: verified local 24h adjusted-pair cache")
+            return cached
+    candidates = []
+    if mode == "auto":
+        if os.environ.get("TIINGO_API_KEY"):
+            candidates.append("tiingo")
+        if os.environ.get("TWELVEDATA_API_KEY"):
+            candidates.append("twelvedata")
+        candidates += ["yahoo", "nasdaq"]
+    else:
+        candidates = [mode]
+
+    for candidate in candidates:
         try:
-            result = _price_rows_from_yahoo(ticker, start, end, folder)
-            log("Prices: fetched adjusted daily Yahoo historical closes")
-            return result
-        except Exception as exc:
-            errors.append("Yahoo: " + str(exc)[:250])
-            log("Yahoo prices unavailable: " + str(exc)[:180])
-            if mode == "yahoo":
-                raise
-    if mode in ("auto", "nasdaq"):
-        try:
-            rows, audit = _price_rows_from_nasdaq(ticker)
-            if errors:
-                audit["failed_yahoo_attempt"] = errors
-            log("Prices: using existing user-verified Nasdaq raw CSV pair")
+            if candidate == "tiingo":
+                rows, audit = providers.tiingo_pair(
+                    ticker, start, end, os.environ.get("TIINGO_API_KEY", ""))
+            elif candidate == "twelvedata":
+                rows, audit = providers.twelvedata_pair(
+                    ticker, start, end, os.environ.get("TWELVEDATA_API_KEY", ""))
+            elif candidate == "yahoo":
+                rows, audit = _price_rows_from_yahoo(ticker, start, end, folder)
+                # Yahoo CSV hashes already passed from its original downloader.
+                audit["requested_start"] = start.isoformat()
+                audit["requested_end"] = end.isoformat()
+            elif candidate == "nasdaq":
+                rows, audit = _price_rows_from_nasdaq(ticker)
+            else:
+                raise ValueError("Unsupported provider: " + candidate)
+            if candidate != "nasdaq":
+                providers.save_pair_cache(ticker, rows, audit, root)
+            audit["providers_attempted"] = [*errors, {"provider": candidate, "status": "used"}]
+            log(f"Prices: using {audit['provider']} ({len(rows)} matched sessions)")
             return rows, audit
-        except Exception as exc:
-            errors.append("Nasdaq: " + str(exc)[:250])
+        except (RuntimeError, ValueError, KeyError, OSError, TypeError) as exc:
+            # No token or raw API URL may be copied into logs or reports.
+            reason = str(exc)[:180]
+            errors.append({"provider": candidate, "status": "unavailable",
+                           "reason": reason})
+            log(f"Price provider {candidate} unavailable: {reason}")
     raise RuntimeError(
-        "No usable source-verified price pair for " + ticker + ": " + "; ".join(errors)
-        + ". If Yahoo is rate-limited, do not retry repeatedly. "
-        + "Download the actual ticker and QQQ historical CSVs from Nasdaq, then run: "
-        + "python run_all.py --ticker " + ticker
-        + " --prices nasdaq --stock-csv /path/to/stock.csv "
-        + "--qqq-csv /path/to/QQQ.csv --confirm-nasdaq")
+        f"No source-verified stock/QQQ daily pair for {ticker}. "
+        + "; ".join(x["provider"] + ": " + x["reason"] for x in errors)
+        + ". For Nasdaq CSV: --prices nasdaq "
+        "--stock-csv /path/to/stock.csv --qqq-csv /path/to/QQQ.csv --confirm-nasdaq")
 
 
 def _news_rows(ticker: str, start: date, end: date, max_news: int, log=print):
@@ -409,7 +444,9 @@ def main(argv=None):
     parser.add_argument("--news-days", type=int, default=90)
     parser.add_argument("--max-news", type=int, default=15)
     parser.add_argument("--max-filings", type=int, default=50)
-    parser.add_argument("--prices", choices=["auto", "yahoo", "nasdaq"], default="auto")
+    parser.add_argument("--prices", choices=["auto", "tiingo", "twelvedata", "yahoo", "nasdaq"],
+                        default="auto",
+                        help="auto: 24h verified cache, Tiingo key, Twelve Data key, Yahoo, local Nasdaq")
     parser.add_argument("--stock-csv", type=Path,
                         help="Original Nasdaq stock CSV (may stay in ~/Downloads); imported to inputs/prices/<TICKER>.csv")
     parser.add_argument("--qqq-csv", type=Path,
