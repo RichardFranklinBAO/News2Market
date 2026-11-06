@@ -121,6 +121,32 @@ Enable **Local LLM** in the dashboard only after Ollama is installed and the mod
 
 **Potential future extension — hosted model APIs:** With appropriate funding, permitted data access and independent benchmarks, the architecture could support an **OpenAI API** adapter (or other hosted LLM services) in addition to Ollama. That would permit comparison of more capable models on event classification, economic-channel interpretation, evidence faithfulness, output validity and inference cost. **This is a proposed extension only: no OpenAI API integration, paid model calls or cross-model accuracy comparison is implemented or reported.** Hosted inference would introduce API charges and require reviewing news-text licensing, data-sharing/privacy requirements and reproducibility. Larger or hosted models **might** improve annotation quality, but improvement must be demonstrated against independently reviewed labels rather than assumed.
 
+## Optional Research Extension — SEC Disclosures and Text Evaluation
+
+The optional **research** command extends the three-company pipeline with a provenance-first **SEC EDGAR 8-K / 10-Q / 10-K dataset**, official Loughran–McDonald text features, and descriptive TF-IDF vocabulary measures. It can read saved News2Market news CSVs alongside company-specific filings, with stable document identifiers, sources, dates, hashes, deduplication and missing-data audits. **The original English dashboard and `python -m news2market --web` remain unchanged.**
+
+```bash
+# View the separate optional research commands
+python -m news2market research --help
+
+# Request SEC metadata with YOUR real name/contact in the SEC User-Agent
+export N2M_SEC_USER_AGENT='Your Name your-real-email@example.com'
+python -m news2market research sec --ticker NVDA \
+  --start 2025-01-01 --end 2026-11-05 --max-filings 10
+
+# Optional: also retrieve permitted primary HTML filings and measure text
+python -m news2market research sec --ticker NVDA \
+  --start 2025-01-01 --end 2026-11-05 --max-filings 5 --fetch-bodies
+
+# Or re-measure an already captured local article CSV, with no web access
+python -m news2market research measure --ticker NVDA \
+  --input-csv path/to/saved_articles.csv
+```
+
+**Research safeguards:** SEC access identifies the user, throttles requests and stops on 403/429; the local results folder is excluded from GitHub. TF-IDF is **not sentiment by itself**, and this update **does not reproduce XLex's RoBERTa/SHAP lexicon construction or benchmark pretrained transformers**. A chronological TF-IDF-versus-LM comparison is available **only if the user supplies sufficient independently annotated human sentiment labels**; the existing AI-assisted labels do not count as such ground truth. No significant market prediction or out-of-sample improvement is claimed.
+
+**Methods, required inputs, responsible access and limitations:** [Financial Text Research Extension](docs/FINANCIAL_TEXT_RESEARCH.md). The research extension is independent from the existing stock-price/QQQ exploratory analysis, and time-of-first-market-availability is not verified for SEC filing documents.
+
 ## Data Sources and Measurement Definitions
 
 | Input | Official source | Pilot / version |

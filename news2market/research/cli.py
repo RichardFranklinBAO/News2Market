@@ -1,0 +1,205 @@
+"""Research CLI: SEC data + LM/TF-IDF measurement + human-label OOS checks.
+
+Run: python -m news2market research --help
+The original dashboard remains: python -m news2market --web
+"""
+from __future__ import annotations
+import argparse
+import hashlib
+import json
+import os
+import sys
+from datetime import datetime,timezone
+from pathlib import Path
+from . import sec
+from .metrics import canonical_rows, load_official_lm, measure_rows,tfidf_descriptives,read_articles_csv,write_rows
+from .evaluation import benchmark_human_labels,read_human_labels,EvaluationNotSupported
+
+ROOT=Path(__file__).resolve().parents[2]
+LM_PATH=ROOT/'Inputs'/'Loughran-McDonald_MasterDictionary_1993-2025.csv'
+
+
+def write_json(path,contents):
+    Path(path).parent.mkdir(parents=True,exist_ok=True)
+    Path(path).write_text(json.dumps(contents,indent=2,ensure_ascii=False,default=str),encoding='utf-8')
+
+
+def run_folder(ticker,output_root=None):
+    base=Path(output_root) if output_root is not None else ROOT/'Results'
+    name=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+    target=base/ticker/'Research'/name
+    target.mkdir(parents=True,exist_ok=False)
+    return target
+
+
+def _company(ticker):
+    from news2market.core import COMPANIES
+    sym=ticker.upper()
+    if sym not in COMPANIES:raise ValueError('Choose NVDA, AAPL or GOOGL')
+    return sym,COMPANIES[sym]
+
+
+def _score_corpus(rows,folder,dictionary,include_tfidf=True):
+    lex=load_official_lm(dictionary)
+    clean,dropped=canonical_rows(rows)
+    feats,measurement=measure_rows(clean,lex)
+    write_rows(folder/'corpus_local.csv',clean,fields=['article_id','ticker','published_date','accepted_datetime_raw',
+        'published_time_quality','source','source_type','form','accession','url','title','text','text_status',
+        'text_sha256','text_truncated'])
+    write_rows(folder/'research_features.csv',feats,fields=['article_id','ticker','published_date',
+        'accepted_datetime_raw','published_time_quality','source','source_type','form','url','title','text_status',
+        'text_sha256','text_chars','lm_token_count','lm_positive_count','lm_negative_count',
+        'lm_uncertainty_count','lm_positive_per_1000','lm_negative_per_1000','lm_uncertainty_per_1000',
+        'lm_polarity_hits','lm_polarity','lm_text_truncated'])
+    if include_tfidf:
+        top,diag=tfidf_descriptives(clean)
+        write_rows(folder/'tfidf_top_terms.csv',top,fields=['article_id','term','tfidf_weight'])
+    else:diag={'status':'disabled'}
+    return {'measurement':measurement,'tfidf':diag,'deduplicated':len(dropped),
+            'excluded':dropped[:40], 'output_records':len(feats),
+            'warning':'Outputs are research measurements, not verified financial surprises or stock-return predictions'}
+
+
+def command_sec(args):
+    ticker,company=_company(args.ticker)
+    folder=run_folder(ticker,args.output_root)
+    audit={'ticker':ticker,'cik':company['cik'],'source':'SEC EDGAR / data.sec.gov submissions API',
+           'data_source':'https://www.sec.gov/search-filings/edgar-application-programming-interfaces',
+           'study_window':{'start':args.start,'end':args.end},'forms':['8-K','10-Q','10-K'],
+           'sec_user_agent_declared':False,'body_fetch_requested':bool(args.fetch_bodies),
+           'past_filings_completeness':'recent submissions arrays only; older archive shards not downloaded',
+           'acceptance_time_warning':'SEC acceptance fields are recorded verbatim; market-availability timestamps not independently verified',
+           'limits':['no causal inference','no automatic Nasdaq download','source HTML may contain boilerplate or attachments not extracted']}
+    try:
+        if args.submissions_json:
+            src=Path(args.submissions_json)
+            if src.stat().st_size > 20_000_000:raise ValueError('SEC submissions fixture >20MB')
+            submissions=json.loads(src.read_text(encoding='utf-8'))
+            audit['submissions_source']='user_supplied_local_json'
+            audit['submissions_sha256']=hashlib.sha256(src.read_bytes()).hexdigest()
+        else:
+            agent=args.sec_user_agent or os.environ.get('N2M_SEC_USER_AGENT','')
+            client=sec.SecClient(agent)
+            audit['sec_user_agent_declared']=True
+            submissions=client.submissions(company['cik'])
+            audit['submissions_source']='data.sec.gov API'
+        rows=sec.select_filings(submissions,company['cik'],args.start,args.end,limit=args.max_filings)
+        for row in rows:row['ticker']=ticker
+        audit['disclosures_selected']=len(rows)
+        if args.fetch_bodies and rows:
+            agent=args.sec_user_agent or os.environ.get('N2M_SEC_USER_AGENT','')
+            if not sec.valid_agent(agent):
+                raise ValueError('Reading SEC filing bodies requires a declared SEC user agent with a contact email')
+            if 'client' not in locals():client=sec.SecClient(agent)
+            audit['sec_user_agent_declared']=True
+            rows,issues=sec.fetch_bodies(client,rows)
+            audit['download_issues']=issues
+            audit['body_successes']=sum(x.get('text_status')=='extracted' for x in rows)
+        else:
+            audit['body_successes']=0
+        # Header-only output is still useful when access to body text is disabled.
+        write_rows(folder/'sec_filings.csv',rows,fields=['article_id','ticker','cik','form','accession',
+          'published_date','accepted_datetime_raw','published_time_quality','source','source_type','url',
+          'title','text_status','text_truncated','text_sha256'])
+        if args.news_csv:
+            additional=read_articles_csv(args.news_csv)
+            for r in additional:r['ticker']=ticker
+            rows.extend(additional)
+            audit['additional_local_news']=len(additional)
+            audit['news_csv_sha256']=hashlib.sha256(Path(args.news_csv).read_bytes()).hexdigest()
+        if any(len(str(r.get('text') or '').strip())>=30 for r in rows):
+            audit['research_scores']=_score_corpus(rows,folder,args.dictionary,not args.no_tfidf)
+        else:
+            audit['research_scores']={'status':'no_full_text_available',
+                'how_to_proceed':'Add --fetch-bodies with N2M_SEC_USER_AGENT or --news-csv with saved articles'}
+        audit['status']='completed_with_limitations'
+    except Exception as e:
+        audit['status']='failed'
+        audit['error']=f'{type(e).__name__}: {str(e)[:400]}'
+        write_json(folder/'research_audit.json',audit)
+        raise
+    write_json(folder/'research_audit.json',audit)
+    return folder,audit
+
+
+def command_measure(args):
+    ticker,_=_company(args.ticker)
+    folder=run_folder(ticker,args.output_root)
+    try:
+        original=[];hashes={}
+        for inp in args.input_csv:
+            p=Path(inp)
+            original.extend(read_articles_csv(p))
+            hashes[str(p.name)]=hashlib.sha256(p.read_bytes()).hexdigest()
+        for r in original:r['ticker']=ticker
+        results=_score_corpus(original,folder,args.dictionary,not args.no_tfidf)
+        audit={'status':'complete','ticker':ticker,'inputs_sha256':hashes,'outputs':results,
+            'limitations':['No human-valid sentiment labels are inferred by this command',
+                           'TF-IDF is a text representation, not an economic-shock measure',
+                           'XLex transformer/SHAP training was not run']}
+        write_json(folder/'research_audit.json',audit)
+        return folder,audit
+    except Exception as e:
+        write_json(folder/'research_audit.json',{'status':'failed','error':f'{type(e).__name__}: {e}'})
+        raise
+
+
+def command_benchmark(args):
+    ticker,_=_company(args.ticker)
+    folder=run_folder(ticker,args.output_root)
+    try:
+        raw=read_articles_csv(args.corpus_csv)
+        data,_=canonical_rows(raw)
+        labels=read_human_labels(args.labels_csv)
+        lex=load_official_lm(args.dictionary)
+        result=benchmark_human_labels(data,labels,lex)
+        audit={'status':'complete','ticker':ticker,'result':result,
+               'corpus_sha256':hashlib.sha256(Path(args.corpus_csv).read_bytes()).hexdigest(),
+               'labels_sha256':hashlib.sha256(Path(args.labels_csv).read_bytes()).hexdigest(),
+               'note':'Human labels are user asserted and have not been independently checked by the tool'}
+        write_json(folder/'human_label_benchmark.json',audit)
+        return folder,audit
+    except Exception as e:
+        write_json(folder/'human_label_benchmark.json',{'status':'not_estimated',
+                  'reason':f'{type(e).__name__}: {str(e)[:400]}'})
+        raise
+
+
+def main(argv=None):
+    p=argparse.ArgumentParser(prog='python -m news2market research',
+        description='Auditable SEC filings, LM/TF-IDF features and held-out independent-label checks')
+    sub=p.add_subparsers(dest='action',required=True)
+    secp=sub.add_parser('sec',help='Collect selected-company 8-K/10-Q/10-K metadata, optional filing text and LM features')
+    secp.add_argument('--ticker',required=True,choices=['NVDA','AAPL','GOOGL'])
+    secp.add_argument('--start',required=True,help='Inclusive YYYY-MM-DD filing date')
+    secp.add_argument('--end',required=True,help='Inclusive YYYY-MM-DD filing date')
+    secp.add_argument('--max-filings',type=int,default=10)
+    secp.add_argument('--fetch-bodies',action='store_true',help='Retrieve permitted primary HTML documents, not exhibits')
+    secp.add_argument('--sec-user-agent',default=None,help='Your name and contact email, or N2M_SEC_USER_AGENT environment variable')
+    secp.add_argument('--submissions-json',help='Offline SEC submissions snapshot; no API request unless --fetch-bodies')
+    secp.add_argument('--news-csv',help='Optional saved News2Market article corpus to join to SEC document dataset')
+    secp.add_argument('--dictionary',type=Path,default=LM_PATH)
+    secp.add_argument('--no-tfidf',action='store_true')
+    secp.add_argument('--output-root',type=Path,default=None)
+    m=sub.add_parser('measure',help='Re-score existing locally collected article CSV(s); no network requests')
+    m.add_argument('--ticker',required=True,choices=['NVDA','AAPL','GOOGL'])
+    m.add_argument('--input-csv',action='append',required=True,help='CSV with title,text,published_date,article_id,source,url')
+    m.add_argument('--dictionary',type=Path,default=LM_PATH)
+    m.add_argument('--no-tfidf',action='store_true');m.add_argument('--output-root',type=Path,default=None)
+    b=sub.add_parser('benchmark',help='Chronological sentiment classification evaluation; independent human labels required')
+    b.add_argument('--ticker',required=True,choices=['NVDA','AAPL','GOOGL'])
+    b.add_argument('--corpus-csv',required=True)
+    b.add_argument('--labels-csv',required=True)
+    b.add_argument('--dictionary',type=Path,default=LM_PATH)
+    b.add_argument('--output-root',type=Path,default=None)
+    args=p.parse_args(argv)
+    try:
+        folder,audit={'sec':command_sec,'measure':command_measure,'benchmark':command_benchmark}[args.action](args)
+    except (ValueError,FileNotFoundError,EvaluationNotSupported,sec.SecAccessError) as e:
+        p.exit(2,f'Research command stopped: {e}\nCheck Results/<TICKER>/Research for a failure audit; no synthetic findings are generated.\n')
+    print(json.dumps({'run_folder':str(folder),'status':audit['status'],
+                      'filings':audit.get('disclosures_selected'),
+                      'feature_records':audit.get('outputs',{}).get('output_records')},indent=2))
+    return audit
+
+if __name__=='__main__':main()

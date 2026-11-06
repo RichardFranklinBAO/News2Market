@@ -9,3 +9,5 @@ statsmodels>=0.14,<1
 gdown>=5.2,<6
 # Optional external web extraction (only invoked with --web-news)
 trafilatura>=1.12,<3
+# Descriptive TF-IDF and optional time-ordered independent-label benchmark
+scikit-learn>=1.4,<2
