@@ -10,6 +10,8 @@ It integrates **company news (Workflow A)** and **SEC EDGAR filings (Workflow B)
 
 **Phase I (November 2026): implemented and exercised on real NVDA, TSLA and AMD data.** This is an exploratory research pipeline, **not** a demonstrated return-prediction or trading system.
 
+**Code organization:** Stage-specific helper scripts are grouped under [scripts/](scripts/) (collection, preparation, NLP, market data, and reporting); the user-facing entrypoint remains `run_all.py`.
+
 **Run locally** (Python 3.11–3.12; [setup details](docs/ONE_COMMAND_WORKFLOW.md)):
 
 ```bash

@@ -151,8 +151,7 @@ class CompanySwitchTests(unittest.TestCase):
         groups=("shared", "step_01_collect", "step_02_prepare",
                 "step_03_nlp", "step_04_market", "step_05_report")
         self.assertTrue(all((scripts / p / "__init__.py").is_file() for p in groups))
-        self.assertFalse(list(scripts.glob("*.py")) == [
-            p for p in scripts.glob("*.py") if p.name != "__init__.py"])
+        self.assertEqual({p.name for p in scripts.glob("*.py")}, {"__init__.py"})
         self.assertTrue(v.SCRIPT_NAMES.issubset(set(v.STAGE_MODULES)))
         self.assertEqual(
             v.STAGE_MODULES["nasdaq_csv_parser.py"],
