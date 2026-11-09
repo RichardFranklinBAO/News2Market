@@ -17,12 +17,7 @@ ROOT=Path(__file__).resolve().parents[3]
 
 
 def load_official_lm(dictionary_path: str | Path):
-    scripts=ROOT/"scripts"
-    if not (scripts/"lm_dictionary.py").is_file():
-        raise FileNotFoundError("Existing News2Market scripts/lm_dictionary.py not available")
-    if str(scripts) not in sys.path:
-        sys.path.insert(0,str(scripts))
-    from lm_dictionary import load_lm_dictionary
+    from scripts.step_03_nlp.lm_dictionary import load_lm_dictionary
     return load_lm_dictionary(Path(dictionary_path))
 
 

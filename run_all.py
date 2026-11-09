@@ -171,8 +171,7 @@ def import_nasdaq_pair(ticker: str, stock_csv: Path, qqq_csv: Path,
                       for x in header}
         if not {"date", "closelast"}.issubset(normalized):
             raise ValueError(f"{src.name}: require Nasdaq Date and Close/Last columns")
-        core.scripts_on_path()
-        from nasdaq_csv_parser import parse_price_csv
+        from scripts.step_04_market.nasdaq_csv_parser import parse_price_csv
         rows, basis = parse_price_csv(src)
         if len(rows) < 3 or basis != "raw_close_unadjusted":
             raise ValueError(f"{src.name}: invalid Nasdaq raw close export")

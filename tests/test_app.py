@@ -148,18 +148,19 @@ class CompanySwitchTests(unittest.TestCase):
         """Avoid old sequence numbers and verify key dynamic imports."""
         import re
         scripts=Path(__file__).resolve().parents[1]/"scripts"
-        names={p.name for p in scripts.glob("*.py")}
-        expected={
-            "external_article_fetcher.py", "lm_sentiment.py", "event_tagging.py",
-            "nasdaq_csv_parser.py", "text_preparation.py", "lm_cleaning_comparison.py",
-            "local_llm_labels.py", "news_feed_discovery.py", "common.py",
-            "lm_dictionary.py", "nvidia_scraper.py", "signal_core.py"
-        }
-        self.assertEqual(names,expected)
-        self.assertTrue(v.SCRIPT_NAMES.issubset(names))
-        self.assertFalse(any(re.match(r"^[0-9]",s) for s in names))
-        self.assertTrue(callable(v.load_script_module("nasdaq_csv_parser.py","n2m_price_smoke").parse_price_csv))
-        self.assertTrue(callable(v.load_script_module("news_feed_discovery.py","n2m_feed_smoke").discover))
+        groups=("shared", "step_01_collect", "step_02_prepare",
+                "step_03_nlp", "step_04_market", "step_05_report")
+        self.assertTrue(all((scripts / p / "__init__.py").is_file() for p in groups))
+        self.assertFalse(list(scripts.glob("*.py")) == [
+            p for p in scripts.glob("*.py") if p.name != "__init__.py"])
+        self.assertTrue(v.SCRIPT_NAMES.issubset(set(v.STAGE_MODULES)))
+        self.assertEqual(
+            v.STAGE_MODULES["nasdaq_csv_parser.py"],
+            "scripts.step_04_market.nasdaq_csv_parser")
+        self.assertTrue(callable(v.load_script_module(
+            "nasdaq_csv_parser.py","n2m_price_smoke").parse_price_csv))
+        self.assertTrue(callable(v.load_script_module(
+            "news_feed_discovery.py","n2m_feed_smoke").discover))
 
     def test_lowercase_directory_convention(self):
         """Tracked root paths use lowercase names; old input folders are legacy only."""

@@ -8,6 +8,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import importlib
 import importlib.util
 import json
 import math
@@ -27,6 +28,20 @@ SCRIPTS = ROOT / "scripts"
 INPUTS = ROOT / "inputs"
 RESULTS = ROOT / "Results"
 SCRIPT_NAMES = {"lm_sentiment.py", "text_preparation.py", "lm_cleaning_comparison.py", "event_tagging.py"}
+STAGE_MODULES = {
+    "common.py": "scripts.shared.common",
+    "news_feed_discovery.py": "scripts.step_01_collect.news_feed_discovery",
+    "external_article_fetcher.py": "scripts.step_01_collect.external_article_fetcher",
+    "nvidia_scraper.py": "scripts.step_01_collect.nvidia_scraper",
+    "text_preparation.py": "scripts.step_02_prepare.text_preparation",
+    "lm_dictionary.py": "scripts.step_03_nlp.lm_dictionary",
+    "lm_sentiment.py": "scripts.step_03_nlp.lm_sentiment",
+    "event_tagging.py": "scripts.step_03_nlp.event_tagging",
+    "local_llm_labels.py": "scripts.step_03_nlp.local_llm_labels",
+    "nasdaq_csv_parser.py": "scripts.step_04_market.nasdaq_csv_parser",
+    "signal_core.py": "scripts.step_04_market.signal_core",
+    "lm_cleaning_comparison.py": "scripts.step_05_report.lm_cleaning_comparison",
+}
 BENCHMARK = "QQQ"
 MODEL = "qwen2.5:1.5b"
 
@@ -108,20 +123,22 @@ def subtract_years(d, years):
 
 
 def scripts_on_path():
-    if not SCRIPTS.is_dir() or not (SCRIPTS / "lm_dictionary.py").exists():
-        raise FileNotFoundError("Required scripts/ helper modules are missing; reinstall the complete repository")
-    if str(SCRIPTS) not in sys.path:
-        sys.path.insert(0, str(SCRIPTS))
+    """Verify stage packages and allow imports from the repository root."""
+    if not (SCRIPTS / "shared" / "common.py").is_file() or not (
+            SCRIPTS / "step_03_nlp" / "lm_dictionary.py").is_file():
+        raise FileNotFoundError(
+            "Required scripts/ stage packages are missing; reinstall the complete repository")
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
 
 
 def load_script_module(filename, module_name):
+    """Resolve a legacy stage filename to a real importable step package."""
     scripts_on_path()
-    spec = importlib.util.spec_from_file_location(module_name, SCRIPTS / filename)
-    if not spec or not spec.loader:
-        raise ImportError(f"Cannot import existing script {filename}")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    target = STAGE_MODULES.get(filename)
+    if not target:
+        raise ImportError(f"Unknown News2Market stage: {filename}")
+    return importlib.import_module(target)
 
 
 def financial_text_relevance(title, summary, profile):
@@ -165,7 +182,7 @@ def discover_news(profile, ticker, from_day, to_day, max_news, use_proxy=False, 
         try:
             import copy
             import yaml
-            from nvidia_scraper import collect_live
+            from scripts.step_01_collect.nvidia_scraper import collect_live
             cfg=yaml.safe_load((INPUTS/"config.yaml").read_text(encoding="utf-8"))
             cfg=copy.deepcopy(cfg)
             cfg["project"].update({"ticker": ticker, "start_date":from_day, "end_date":to_day})
@@ -277,7 +294,7 @@ def ensure_lm_dictionary(log=print):
     validated sibling file if available. Never commit or download its contents.
     """
     scripts_on_path()
-    from lm_dictionary import load_lm_dictionary
+    from scripts.step_03_nlp.lm_dictionary import load_lm_dictionary
     destination=INPUTS / LM_FILENAME
     if not destination.is_file():
         for name in ("News2Market", "News2Market_GitHub_Test"):
@@ -497,7 +514,7 @@ def subprocess_stage(script,run_dir,ticker,date_start,date_end,log=print,env_ext
     env={**os.environ,"N2M_RESULTS_DIR":str(run_dir),"N2M_CONTEXT":str(context_path)}
     env.update(env_extra or {})
     log(f"Running {script}")
-    completed=subprocess.run([sys.executable,str(SCRIPTS/script)],cwd=ROOT,env=env,
+    completed=subprocess.run([sys.executable,"-m",STAGE_MODULES[script]],cwd=ROOT,env=env,
                              capture_output=True,text=True,timeout=500)
     tail=(completed.stdout+"\n"+completed.stderr).strip()[-3000:]
     (run_dir/("stage_"+script.replace(".py",".log"))).write_text(tail,encoding="utf-8")
@@ -508,7 +525,7 @@ def subprocess_stage(script,run_dir,ticker,date_start,date_end,log=print,env_ext
 
 def _interpret_prices_signals(run_dir,labels,prices,ticker,log=print):
     scripts_on_path()
-    import signal_core
+    from scripts.step_04_market import signal_core
     import pandas as pd
     import statsmodels.api as sm
     import numpy as np
